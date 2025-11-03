@@ -1,4 +1,7 @@
 import json
+from argon2 import PasswordHasher
+
+# Hashing passwords: https://www.geeksforgeeks.org/python/how-to-hash-passwords-in-python/
 
 #TODO
 # Might need to build a find user function
@@ -11,7 +14,7 @@ import json
 def new_user(username: str, role: str):
     user = {
         "username": username, 
-        "password": reset_password(username),
+        "password": hash_password("1234"),
         "role": role
     }
 
@@ -34,33 +37,37 @@ def change_role(username: str, new_role: str):
             
             with open("login.json", "w") as file:
                 json.dump(users, file, indent=4)
-            return
+            return True
         else:
             continue
     
     print("User not found in database. No changes made.")
-    return
+    return False
 
 def change_password():
     username = input("Please enter your username: ")
     current_password = input("Please enter your current password: ")
-    new_password = input("Please enter your new password: ")
+
+    ph = PasswordHasher()
 
     with open("login.json", "r") as file:
         users = json.load(file)
 
     for user in users["logins"]:
-        if user["username"] == username and user["password"] == current_password:
-            user["password"] = new_password
-            
-            with open("login.json", "w") as file:
-                json.dump(users, file, indent=4)
-                print("Password successfully changed.")
-            return
-        else:
-            continue
-    
-    print("User or password were incorrect. No changes made.")
+        try:
+            if user["username"] == username and ph.verify(user["password"], current_password):
+                new_password = input("Please enter your new password: ")
+                user["password"] = hash_password(new_password)
+                
+                with open("login.json", "w") as file:
+                    json.dump(users, file, indent=4)
+                    print("Password successfully changed.")
+                return True
+            else:
+                continue
+        except Exception:
+            print("User or password were incorrect. No changes made.")
+            return False
     return
 
 def reset_password(username):
@@ -69,32 +76,39 @@ def reset_password(username):
 
     for user in users["logins"]:
         if user["username"] == username:
-            user["password"] = "1234"
+            user["password"] = hash_password("1234")
             
             with open("login.json", "w") as file:
                 json.dump(users, file, indent=4)
             print("Password successfully reset.")
-            return
+            return True
         else:
             continue
-    
     print("User not found in database. No changes made.")
-    return
-    
+    return False
 
-#TODO Needs some work I believe
-def login():    
-    with open("login.json", "r") as file:
-        login_details = json.load(file)
-    print(login_details)
-    """
+def hash_password(password: str):
+    ph = PasswordHasher()
+    return ph.hash(password)    
+
+#TODO Test Function
+def login():
+    ph = PasswordHasher()
+    
     username = input("Enter Username: ")
     password = input("Enter Password: ")
-    """
+
+    with open("login.json", "r") as file:
+        users = json.load(file)
     
-    pass
-
-
+    for user in users["logins"]:
+        try:
+            if user["username"] == username and ph.verify(user["password"], password):
+                return True
+            else:
+                continue
+        except Exception:
+            return False
 
 def main():
     #option = input("Press 1 to login: ")
@@ -103,6 +117,7 @@ def main():
     #    option = input("Press 1 to login: ")
 
     #print("Enter Login Details")
+    reset_password("ZJOH")
     change_password()
     pass
 
