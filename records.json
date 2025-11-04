@@ -1,9 +1,27 @@
 {
-    "visit": [
+    "record": [
         {
-            "name": "ZJoh",
-            "DateOfVisit": "1234",
-            "Description": "Admin",
+            "name": "Zachary Johnson",
+            "DateOfVisit": "13/07/2025",
+            "Description": "This is a test entry without a specialist.",
+            "Specialist": ""
+        },
+        {
+            "name": "Phoebe Wise",
+            "DateOfVisit": "13/07/2025",
+            "Description": "This is a test entry with a specialist.",
+            "Specialist": "Matt Specialist"
+        },
+        {
+            "name": "Test 2",
+            "DateOfVisit": "13/07/2025",
+            "Description": "This is a test entry with a specialist.",
+            "Specialist": "Matt Specialist"
+        },
+        {
+            "name": "Z",
+            "DateOfVisit": "1",
+            "Description": "AAAAA",
             "Specialist": ""
         }
     ]
