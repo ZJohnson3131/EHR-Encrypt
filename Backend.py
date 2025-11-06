@@ -133,13 +133,13 @@ def return_specialist_records(specialist_name: str):
             records_found.append(record)
     return records_found
 
-#TODO Need to set a default value of "" or whatever works for a NULL value when inputting the specialist.
-#TODO Need to include encryption for values in here.  
-def add_record(name: str, date_of_visit: str, description: str, specialist: str):
-    lookup_db = sqlite3.connect("lookup.db")
-    lookup_cursor = lookup_db.cursor()
 
-    table_create = [
+def create_db_tables(database):
+    lookup_cursor = database.cursor()
+
+    # Creates table if the database is brand new
+    #TODO Add data types and confirm dateTime data type
+    lookup_cursor.execute(
         """CREATE TABLE IF NOT EXISTS patients (
         patient_id INTEGER PRIMARY KEY AUTOINCREMENT,
         first_name ,
@@ -147,8 +147,9 @@ def add_record(name: str, date_of_visit: str, description: str, specialist: str)
         date_of_birth ,
         address ,
         allergies 
-        ); """,
-        
+        ); """)
+    
+    lookup_cursor.execute(
         """CREATE TABLE IF NOT EXISTS records (
         visit_id INTEGER PRIMARY KEY AUTOINCREMENT,
         patient_id INTEGER, 
@@ -157,21 +158,49 @@ def add_record(name: str, date_of_visit: str, description: str, specialist: str)
         specialist_appointed 
         );
         """
-    ]
+    )
+    return
 
-    record = {
-        "name": name,
-        "DateOfVisit": date_of_visit,
-        "Description": description,
-        "Specialist": specialist
-    }
+#TODO Need a way to check if patient already exists in database
+def add_patient_record(first_name: str, last_name, date_of_birth, address, allergies):
+    lookup_db = sqlite3.connect("lookup.db")
+    lookup_cursor = lookup_db.cursor()
 
-    with open("records.json", "r") as file:
-        records = json.load(file)
-        records["record"].append(record)
+    create_db_tables(lookup_db)
 
-    with open("records.json", "w") as file:
-        json.dump(records, file, indent=4)
+    insert = """INSERT INTO patients(first_name, last_name, date_of_birth, address, allergies)
+    VALUES(?,?,?,?,?)"""
+
+    lookup_cursor.execute(insert, (first_name, last_name, date_of_birth, address, allergies))
+    lookup_db.commit()
+    
+    lookup_db.close()
+
+#TODO Implement this
+def delete_patient_record():
+    raise NotImplementedError
+
+#TODO Implement this
+def modify_patient_record():
+    raise NotImplementedError
+
+#TODO Need to set a default value of "" or whatever works for a NULL value when inputting the specialist.
+#TODO Need to include encryption for values in here.  
+#TODO Need to ensure that only patients who exist in the database can have a visit attached. 
+def add_visit_record(patient_id: int, date_of_visit: str, description: str, specialist: str):
+    lookup_db = sqlite3.connect("lookup.db")
+    lookup_cursor = lookup_db.cursor()
+
+    create_db_tables(lookup_db)
+    
+    insert = """INSERT INTO records(patient_id, date_of_visit, visit_description, specialist_appointed)
+    VALUES(?,?,?,?)"""
+
+    lookup_cursor.execute(insert, (patient_id, date_of_visit, description, specialist))
+    lookup_db.commit()
+
+    lookup_db.close()
+
     return
 
 def main():
@@ -181,7 +210,7 @@ def main():
     #    option = input("Press 1 to login: ")
 
     #print("Enter Login Details")
-    add_record("Z", "1", "AAAAA", "")
+    add_patient_record("Z", "J", "1", "2", "None")
 
 
 
