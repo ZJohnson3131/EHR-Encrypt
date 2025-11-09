@@ -11,8 +11,8 @@ from argon2 import PasswordHasher
 #TODO
 # Might need to build a find user function
 # Start understanding what data to put into the database and how to build a SQLite database for housing data. 
-# Hash passwords for user logins
 # Store all data in PT for now before creating CT storage
+# Work out how to store records of who modifies data and what was modified.
 
 global lookup_db
 
@@ -99,17 +99,18 @@ def hash_password(password: str):
     return ph.hash(password)    
 
 #TODO Test Function
-def login():
+def login(username: str, password: str):
     ph = PasswordHasher()
     
-    username = input("Enter Username: ")
-    password = input("Enter Password: ")
+    print(f"Username: {username}")
+    print(f"Password: {password}")
 
     with open("login.json", "r") as file:
         users = json.load(file)
     
     for user in users["logins"]:
         try:
+            print(user["username"].lower())
             if user["username"] == username and ph.verify(user["password"], password):
                 return True
             else:
@@ -117,22 +118,46 @@ def login():
         except Exception:
             return False
 
-#TODO Transfer this to the SQL Database
+# Returns all patients in the database.
+def return_all_patients():
+    # Makes the connection and ensures that the tables are created prior to searching them
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
+
+    lookup_cursor.execute("SELECT * FROM patients")
+
+    lookup_db.close()
+
+    return lookup_cursor.fetchall()    
+
+# Returns all patient visits in the database in the database
 def return_all_records():
-    with open("records.json", "r") as file:
-        records = json.load(file)
-    print(records)
+    # Makes the connection and ensures that the tables are created prior to searching them
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
 
-#TODO Transfer this to the SQL Database
+    lookup_cursor.execute("SELECT * FROM records")
+
+    lookup_db.close()
+
+    return lookup_cursor.fetchall()
+
+#TODO This will return all records that the specialist is associated with. 
+# Maybe I need to consider searching by patient_id to return all records for a particular patient that they have been referred to the particular specialist for.
 def return_specialist_records(specialist_name: str):
-    records_found = []
-    with open("records.json", "r") as file:
-        records = json.load(file)
-    for record in records["record"]:
-        if record["Specialist"].lower() == specialist_name.lower():
-            records_found.append(record)
-    return records_found
+    # Makes the connection and ensures that the tables are created prior to searching them
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
 
+    search_sql = "SELECT * FROM records WHERE specialist_appointed = ?"
+    lookup_cursor.execute("SELECT * FROM records WHERE specialist_appointed = ?", (specialist_name,))
+    
+    lookup_db.close()
+
+    return lookup_cursor.fetchall()
 
 def create_db_tables(database):
     lookup_cursor = database.cursor()
@@ -161,32 +186,41 @@ def create_db_tables(database):
     )
     return
 
-#TODO Need a way to check if patient already exists in database
 def add_patient_record(first_name: str, last_name, date_of_birth, address, allergies):
     lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
 
     create_db_tables(lookup_db)
 
-    insert = """INSERT INTO patients(first_name, last_name, date_of_birth, address, allergies)
-    VALUES(?,?,?,?,?)"""
-
-    lookup_cursor.execute(insert, (first_name, last_name, date_of_birth, address, allergies))
-    lookup_db.commit()
+    lookup_cursor.execute("SELECT count(*) FROM patients WHERE first_name = ? AND last_name = ? AND address = ?", (first_name, last_name, address))
+    data=lookup_cursor.fetchall()
     
-    lookup_db.close()
+    if len(data)==0:
+        insert = """INSERT INTO patients(first_name, last_name, date_of_birth, address, allergies)
+        VALUES(?,?,?,?,?)"""
 
-#TODO Implement this
-def delete_patient_record():
+        lookup_cursor.execute(insert, (first_name, last_name, date_of_birth, address, allergies))
+        lookup_db.commit()
+    else:
+        print("User already exists in database.")
+
+    lookup_db.close()
+    return
+
+def delete_visit_record():
     raise NotImplementedError
 
-#TODO Implement this
+def delete_patient_record():
+    # This will need to check through all patient visit records first and then oce all of them are deleted, it can delete the patient.
+    raise NotImplementedError
+
 def modify_patient_record():
     raise NotImplementedError
 
 #TODO Need to set a default value of "" or whatever works for a NULL value when inputting the specialist.
 #TODO Need to include encryption for values in here.  
 #TODO Need to ensure that only patients who exist in the database can have a visit attached. 
+#TODO Need to check for an existing entry that matches the entry attempting to be inserted. Do this in a similar way as was done for patients.
 def add_visit_record(patient_id: int, date_of_visit: str, description: str, specialist: str):
     lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
@@ -211,6 +245,11 @@ def main():
 
     #print("Enter Login Details")
     add_patient_record("Z", "J", "1", "2", "None")
+
+    #add_visit_record(1, "1", "1", "ZJ")
+    #add_visit_record(2, "1", "1", "")
+
+    return_specialist_records("ZJ")
 
 
 
