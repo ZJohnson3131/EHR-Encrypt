@@ -9,6 +9,13 @@ from argon2 import PasswordHasher
 
 
 #TODO
+# Work on searching for individuals. Once found, work out how best to pass them back to the frontend functions and display.
+# Work on role-based logins to limit information allowed for users to access when they login.
+# Login function needs to also return the role of the user, this can then be saved in a global variable in the frontend for restricting access to files 
+# Make sure all staff functions are updated for SQLite database
+
+# TODO Create Database load script to build an initial database for an external user including patients, staff and visit records.
+
 # Might need to build a find user function
 # Start understanding what data to put into the database and how to build a SQLite database for housing data. 
 # Store all data in PT for now before creating CT storage
@@ -16,46 +23,76 @@ from argon2 import PasswordHasher
 
 global lookup_db
 
-#TODO Check if user already exists
-def new_user(username: str, name: str, role: str):
-    user = {
-        "username": username, 
-        "name": name,
-        "password": hash_password("1234"),
-        "role": role
-    }
+#FIXME Make sure all SQL lookups are closing the database prior to returning the function.
 
-    with open("login.json", "r") as file:
-        users = json.load(file)
-        users["logins"].append(user)
-    print(users)
+# TODO Build Test
+def new_user(username: str, f_name: str, l_name: str, role: str):
+    """_summary_
 
-    with open("login.json", "w") as file:
-        json.dump(users, file, indent=4)
-    return
-
+    Args:
+        username (str): _description_
+        f_name (str): _description_
+        l_name (str): _description_
+        role (str): _description_
+    """
+    if lookup_user(username):
+        lookup_db = sqlite3.connect("Lookup.db")
+        lookup_cursor = lookup_db.cursor()
+        # FIXME Need to create a unique username or find a way of generating this within the SQL Database.
+        lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?)", (username, f_name, l_name, role))
+        lookup_db.close()
+        return True
+    else:
+        return False
+#TODO Build Test
 def change_role(username: str, new_role: str):
-    with open("login.json", "r") as file:
-        users = json.load(file)
+    """_summary_
 
-    for user in users["logins"]:
-        if user["username"] == username:
-            user["role"] = new_role
-            
-            with open("login.json", "w") as file:
-                json.dump(users, file, indent=4)
+    Args:
+        username (str): _description_
+        new_role (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if lookup_user(username):
+        lookup_db = sqlite3.connect("Lookup.db")
+        lookup_cursor = lookup_db.cursor()
+        lookup_cursor.execute("UPDATE staff SET role = ? WHERE user_name = ?", (new_role, username))
+        lookup_db.close()
+        return True
+    else:
+        return False        
+
+#TODO Build Test
+def change_password(username, current_password, new_password, confirm_password):
+    """_summary_
+
+    Args:
+        username (_type_): _description_
+        current_password (_type_): _description_
+        new_password (_type_): _description_
+        confirm_password (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    ph = PasswordHasher()
+
+    if lookup_user(username):
+        lookup_db = sqlite3.connect("Lookup.db")
+        lookup_cursor = lookup_db.cursor()
+        
+        password_check = lookup_cursor.execute("SELECT password FROM staff WHERE user_name = ?", (username,))
+        
+        if ph.verify(password_check, current_password) and new_password == confirm_password:
+            lookup_cursor.execute("UPDATE staff SET password = ? WHERE user_name = ?", (hash_password(new_password), username))
+            lookup_db.close()
             return True
         else:
-            continue
-    
-    print("User not found in database. No changes made.")
-    return False
-
-def change_password():
-    username = input("Please enter your username: ")
-    current_password = input("Please enter your current password: ")
-
-    ph = PasswordHasher()
+            return False
+    else:
+        return False        
 
     with open("login.json", "r") as file:
         users = json.load(file)
@@ -76,43 +113,116 @@ def change_password():
             print("User or password were incorrect. No changes made.")
             return False
     return
-
+    
+# TODO Build Test
 def reset_password(username):
-    with open("login.json", "r") as file:
-        users = json.load(file)
+    """_summary_
 
-    for user in users["logins"]:
-        if user["username"] == username:
-            user["password"] = hash_password("1234")
-            
-            with open("login.json", "w") as file:
-                json.dump(users, file, indent=4)
-            print("Password successfully reset.")
-            return True
-        else:
-            continue
-    print("User not found in database. No changes made.")
-    return False
+    Args:
+        username (_type_): _description_
 
+    Returns:
+        _type_: _description_
+    """
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    
+    if lookup_user(username):
+        lookup_cursor.execute("UPDATE staff SET password = ? WHERE user_name = ?", (hash_password("1234"), username))
+        lookup_db.close()
+        return True
+    else:
+        lookup_db.close()
+        return False
+   
+# TODO Build Test    
+def lookup_user(username):
+    """_summary_
+
+    Args:
+        username (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
+    
+    # If username is in datatable, the reset the password.
+    user_lookup = lookup_cursor.execute("SELECT * FROM staff WHERE user_name = ?", (username,))
+    if len(user_lookup.fetchall()) == 0:
+        lookup_db.close()
+        return False
+    else:
+        return True
+
+# TODO Build Test
+def check_staff_exists(username):
+    """_summary_
+
+    Args:
+        username (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
+    
+    # If username is in datatable, the reset the password.
+    user_lookup = lookup_cursor.execute("SELECT * FROM staff WHERE user_name = ?", (username,))
+    if len(user_lookup.fetchall()) == 0:
+        return False
+    else:    
+        return True
+
+# TODO Build Test
 def hash_password(password: str):
+    """_summary_
+
+    Args:
+        password (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
     ph = PasswordHasher()
     return ph.hash(password)    
 
-#TODO Test Function
+# TODO Build Test
 def login(username: str, password: str):
+    """_summary_
+
+    Args:
+        username (str): _description_
+        password (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if lookup_user(username):
+        ph = PasswordHasher()
+        lookup_db = sqlite3.connect("Lookup.db")
+        lookup_cursor = lookup_db.cursor()
+        password_check = lookup_cursor.execute("SELECT password FROM staff WHERE user_name = ?", (username,))
+        if ph.verify(password, password_check):
+            return True, lookup_cursor.execute("SELECT role FROM staff WHERE user_name = ?", (username,))
+        else:
+            return False
+    else:
+        return False
+
     ph = PasswordHasher()
-    
-    print(f"Username: {username}")
-    print(f"Password: {password}")
 
     with open("login.json", "r") as file:
         users = json.load(file)
     
     for user in users["logins"]:
         try:
-            print(user["username"].lower())
-            if user["username"] == username and ph.verify(user["password"], password):
-                return True
+            if user["username"].lower() == username and ph.verify(user["password"], password):
+                return True, user["role"]
             else:
                 continue
         except Exception:
@@ -127,9 +237,30 @@ def return_all_patients():
 
     lookup_cursor.execute("SELECT * FROM patients")
 
+    search_results = lookup_cursor.fetchall()
+
     lookup_db.close()
 
-    return lookup_cursor.fetchall()    
+    return search_results   
+
+def search_patients(f_name, l_name, search_role):
+    # FIXME Still needs some work on how to appropriately link specialists with patient records.
+    # Will likely need a join of some form between the staff, visits and patients tables. 
+    # Makes the connection and ensures that the tables are created prior to searching them
+    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
+
+    if search_role == "Dr" or search_role == "Admin":
+        lookup_cursor.execute("SELECT * FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+
+    elif search_role == "Specialist":
+        lookup_cursor.execute("SELECT * FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+    search_results = lookup_cursor.fetchall()
+
+    lookup_db.close()
+
+    return search_results
 
 # Returns all patient visits in the database in the database
 def return_all_records():
@@ -140,9 +271,11 @@ def return_all_records():
 
     lookup_cursor.execute("SELECT * FROM records")
 
+    search_results = lookup_cursor.fetchall()
+
     lookup_db.close()
 
-    return lookup_cursor.fetchall()
+    return search_results
 
 #TODO This will return all records that the specialist is associated with. 
 # Maybe I need to consider searching by patient_id to return all records for a particular patient that they have been referred to the particular specialist for.
@@ -155,9 +288,11 @@ def return_specialist_records(specialist_name: str):
     search_sql = "SELECT * FROM records WHERE specialist_appointed = ?"
     lookup_cursor.execute("SELECT * FROM records WHERE specialist_appointed = ?", (specialist_name,))
     
+    search_results = lookup_cursor.fetchall()
+
     lookup_db.close()
 
-    return lookup_cursor.fetchall()
+    return search_results
 
 def create_db_tables(database):
     lookup_cursor = database.cursor()
@@ -172,7 +307,8 @@ def create_db_tables(database):
         date_of_birth ,
         address ,
         allergies 
-        ); """)
+        ); """
+    )
     
     lookup_cursor.execute(
         """CREATE TABLE IF NOT EXISTS records (
@@ -181,6 +317,17 @@ def create_db_tables(database):
         date_of_visit ,
         visit_description ,
         specialist_appointed 
+        );
+        """
+    )
+    
+    lookup_cursor.execute(
+        """CREATE TABLE IF NOT EXISTS staff (
+        user_name PRIMARY KEY, 
+        first_name,
+        last_name,
+        password,
+        role
         );
         """
     )
@@ -243,13 +390,14 @@ def main():
     #    print("Invalid input!")
     #    option = input("Press 1 to login: ")
 
+    search_patients('Z', 'J')
     #print("Enter Login Details")
-    add_patient_record("Z", "J", "1", "2", "None")
+    #add_patient_record("Z", "J", "1", "2", "None")
 
     #add_visit_record(1, "1", "1", "ZJ")
     #add_visit_record(2, "1", "1", "")
 
-    return_specialist_records("ZJ")
+    #return_specialist_records("ZJ")
 
 
 

@@ -3,62 +3,268 @@ from tkinter import messagebox
 import Backend
 
 #https://www.geeksforgeeks.org/python/create-a-modern-login-ui-using-customtkinter-module-in-python/
+#https://customtkinter.tomschimansky.com/documentation/widgets/tabview/
+
+global logged_in_role
+
+def login_window():
+    def login():
+        valid_login, logged_in_role = Backend.login(user_name.get(), user_pass.get())
+        if valid_login:
+            # TODO Check if the logged in user is an admin or not. If admin then open a different style of window rather than a standard user. 
+            # This is where we would start destroy the login window and open the data entry windows
+            messagebox.showinfo("Valid Login", f"Good Login. User logged in as: {logged_in_role}")
+            window.destroy()
+            main_window()
+        if not valid_login:
+            messagebox.showwarning("Invalid Login", "Incorrect Username or Password. Please try again.")
+        return
+    
+    window = ctk.CTk()
+    window.geometry("400x400")
+    window.title("Monash University Secured Electronic Health Record")
+    
+    frame = ctk.CTkFrame(window)
+    frame.pack(pady=40, padx=40, fill="both", expand=True)
+
+    title = ctk.CTkLabel(frame, text="User Login", font=("Arial", 20))
+    title.pack(pady=12)
+
+    user_name = ctk.CTkEntry(frame, placeholder_text="Username")
+    user_name.pack(pady=10)
+
+    user_pass = ctk.CTkEntry(frame, placeholder_text="Password", show="*")
+    user_pass.pack(pady=10)
+
+    login_button = ctk.CTkButton(frame, text="Login", command=login)
+    login_button.pack(pady=20)
+
+    window.mainloop()
+
+def main_window():
+    def find_users():
+        # TODO Will be used to search the database and return all users that match with the First and Last name passed in
+        f_name = search_f_name.get()
+        l_name = search_l_name.get()
+        results = Backend.search_patients(f_name, l_name, "Admin")
+        print(results)
+        
+    def add_new_patient():
+        tabview.set("Patient Data")
+    
+    def delete_existing_patient():
+        f_name = search_f_name.get()
+        l_name = search_l_name.get()
+        
+        results = Backend.search_patients(f_name, l_name, "Admin")
+        
+        result_window = ctk.CTkToplevel()
+        result_window.title("Search Results")
+        result_window.geometry("300x300")
+        
+        ctk.CTkLabel(result_window, text="Select a Person").pack(pady=10)
+
+        listbox = ctk.CTkScrollableFrame(result_window, width=250, height=200)
+        listbox.pack(padx=10, pady=10)
+
+        for person in results:
+            display_name = f"{person[1]} {person[2]}"
+            btn = ctk.CTkButton(
+                listbox, 
+                text=display_name,
+                command=select_person(person, result_window)
+#                command=lambda p=person: select_person(p, result_window)
+            )
+            btn.pack(pady=5, fill="x")
+
+        print(results)
 
 
-# Selecting GUI theme - dark, light , system (for system default)
-ctk.set_appearance_mode("dark")
+    def select_person(person, window):
+        window.destroy()
+        details_text = f"ID: {person['id']}\nFirst Name: {person['first_name']}\nLast Name: {person['last_name']}\nAge: {person['age']}"
+        details_text.delete("1.0", "end")
+        details_text.insert("1.0", details_text)
 
-# Selecting color theme - blue, green, dark-blue
-ctk.set_default_color_theme("blue")
+        
+        tabview.set("Details")
+    
+    window = ctk.CTk()
+    window.geometry("900x600")
+    window.title("Monash University Secured Electronic Health Record")
+    
+    window.rowconfigure(0, weight=1)
+    window.columnconfigure(0, weight=1)
+    
+    frame = ctk.CTkFrame(window)
+    frame.grid(row=0, column=0, sticky="nsew")
+    
+    # Grid expansion for frame
+    frame.rowconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1)
+    
+    tabview = ctk.CTkTabview(master=frame)
+    tabview.grid(row=0, column=0, sticky="nsew")
 
-app = ctk.CTk()
-app.geometry("400x400")
-app.title("Monash University Secured Electronic Health Record")
+    tabview.add("Patient Search")
+    tabview.add("Patient Data")
+    tabview.add("Visit Data")
+    tabview.set("Patient Search")  # set currently visible tab
+    
+    # PATIENT SEARCH TAB
+    search_tab = tabview.tab("Patient Search")
+    
+    for i in range(4):
+        search_tab.columnconfigure(i, weight=1)
+    for i in range(2):
+        search_tab.rowconfigure(i, weight=1)
+        
+    search_f_name_label = ctk.CTkLabel(search_tab, text="First Name:")
+    search_f_name_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
 
+    search_f_name = ctk.CTkEntry(search_tab, placeholder_text="Enter First Name")
+    search_f_name.grid(row=0, column=1, pady=10, sticky="ew")
+    
+    search_l_name_label = ctk.CTkLabel(search_tab, text="Last Name:")
+    search_l_name_label.grid(row=0, column=2, padx=10, pady=10, sticky="w")
 
-def login():
-    valid_login = Backend.login(user_entry.get(), user_pass.get())
-    print("Login Button Pushed")
-    if valid_login:
-        # This is where we would start destroy the login window and open the data entry windows
-        messagebox.showinfo("Valid Login", "Good Login")
-    if not valid_login:
-        messagebox.showwarning("Invalid Login", "Incorrect Username or Password. Please try again.")
-    return
-    username = "Geeks"
-    password = "12345"
-    new_window = ctk.CTkToplevel(app)
+    search_l_name = ctk.CTkEntry(search_tab, placeholder_text="Enter Last Name")
+    search_l_name.grid(row=0, column=3, pady=10, sticky="ew")
+    
+    search_button = ctk.CTkButton(search_tab, text="Search", command=find_users)
+    search_button.grid(row=1, column=1, pady=20)
+    
+    add_button = ctk.CTkButton(search_tab, text="Add New Patient", command=add_new_patient)
+    add_button.grid(row=1, column=0, pady=20)
+    
+    delete_button = ctk.CTkButton(search_tab, text="Delete Patient Record", command=delete_existing_patient)
+    delete_button.grid(row=1, column=2, pady=20)
+    
+    # PATIENT DATA TAB
+    def save_patient_details():
+        raise NotImplementedError
+    patient_tab = tabview.tab("Patient Data")
 
-    new_window.title("New Window")
+    #FIXME Work on grid values and configure values
+    # Configure tab grid
+    for i in range(5):
+        patient_tab.columnconfigure(i, weight=1)
+    for i in range(7):
+        patient_tab.rowconfigure(i, weight=1)
 
-    new_window.geometry("350x150")
+    patient_f_name_label = ctk.CTkLabel(patient_tab, text="First Name:")
+    patient_f_name_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
 
-    if user_entry.get() == username and user_pass.get() == password:
-        tkmb.showinfo(title="Login Successful",message="You have logged in Successfully")
-        ctk.CTkLabel(new_window,text="GeeksforGeeks is best for learning ANYTHING !!").pack()
-    elif user_entry.get() == username and user_pass.get() != password:
-        tkmb.showwarning(title='Wrong password',message='Please check your password')
-    elif user_entry.get() != username and user_pass.get() == password:
-        tkmb.showwarning(title='Wrong username',message='Please check your username')
-    else:
-        tkmb.showerror(title="Login Failed",message="Invalid Username and password")
+    patient_f_name = ctk.CTkEntry(patient_tab, placeholder_text="Enter First Name")
+    patient_f_name.grid(row=0, column=1, pady=10, sticky="ew")
+    
+    patient_l_name_label = ctk.CTkLabel(patient_tab, text="Last Name:")
+    patient_l_name_label.grid(row=0, column=2, padx=10, pady=10, sticky="w")
 
+    patient_l_name = ctk.CTkEntry(patient_tab, placeholder_text="Enter Last Name")
+    patient_l_name.grid(row=0, column=3, pady=10, sticky="ew")
+    
+    patient_address_label = ctk.CTkLabel(patient_tab, text="Patient Address:")
+    patient_address_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+    
+    # FIXME This needs to be multiline and the placeholder text needs to sit at the top of the entry field.
+    patient_address = ctk.CTkEntry(patient_tab, placeholder_text="Enter Address")
+    patient_address.grid(row=1, column=1, columnspan=5, sticky="nsew")
 
-frame = ctk.CTkFrame(master=app)
-frame.pack(pady=20,padx=40,fill='both',expand=True)
+    patient_dob_label = ctk.CTkLabel(patient_tab, text="Date of Birth:")
+    patient_dob_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+    
+    patient_dob = ctk.CTkEntry(patient_tab, placeholder_text="Enter Date of Birth")
+    patient_dob.grid(row=2, column=1, pady=10, sticky="w")
 
-label = ctk.CTkLabel(master=frame,text='User Login')
-label.pack(pady=12,padx=10)
+    button = ctk.CTkButton(patient_tab, text="Save Patient Data", command=save_patient_details)
+    button.grid(row=6, column=2, pady=20, sticky="w")
+    
 
+    # PATIENT VISIT TAB
+    def create_initial_screen():
+        visit_tab = tabview.tab("Visit Data") 
+            
+        visit_add = ctk.CTkButton(visit_tab, text="Add New Patient Record", command=add_new_visit)
+        visit_add.grid(row=0, column = 0, pady=20)
+        
+        visit_search = ctk.CTkButton(visit_tab, text="Search Existing Record", command=search_existing_visit)
+        visit_search.grid(row=0, column=1, pady=20)
+    
+    def add_new_visit():
+        # This will open a new window and
+        build_visit_cells()
+        
+        
+    
+    def search_existing_visit():
+        pass
+    
+    
+    def build_visit_cells():
+        visit_tab = tabview.tab("Visit Data")
+            
+        patient_f_name_label = ctk.CTkLabel(visit_tab, text="First Name:")
+        patient_f_name_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
 
-user_entry= ctk.CTkEntry(master=frame,placeholder_text="Username")
-user_entry.pack(pady=12,padx=10)
+        patient_f_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter First Name")
+        patient_f_name.grid(row=1, column=1, pady=10, sticky="ew")
 
-user_pass= ctk.CTkEntry(master=frame,placeholder_text="Password",show="*")
-user_pass.pack(pady=12,padx=10)
+        patient_l_name_label = ctk.CTkLabel(visit_tab, text="First Name:")
+        patient_l_name_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
 
+        patient_l_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter First Name")
+        patient_l_name.grid(row=1, column=3, pady=10, sticky="ew")
 
-button = ctk.CTkButton(master=frame,text='Login',command=login)
-button.pack(pady=12,padx=10)
+        date_of_visit_label = ctk.CTkLabel(visit_tab, text="Date of Visit")
+        date_of_visit_label.grid(row=2, column=0, pady=10, sticky="w")   
+        
+        date_of_visit = ctk.CTkEntry(visit_tab, placeholder_text="This will become a selectable box for the date")     
+        date_of_visit.grid(row=2, column=1, pady=10)
+        
+        specialist_appointed_label = ctk.CTkLabel(visit_tab, text="Specialist Appointed")
+        specialist_appointed_label.grid(row=2, column=2, pady=10, sticky="w")
+        
+        specialist_appointed = ctk.CTkEntry(visit_tab, placeholder_text="Please Select Specialist, This should be a drop-down populated with all specialist names in database")     
+        specialist_appointed.grid(row=2, column=1, pady=10)
+        
+        reason_for_visit_label = ctk.CTkLabel(visit_tab, text="Reason for Visit")
+        reason_for_visit_label.grid(row=3, column=0, pady=10, sticky="w")
+        
+        reason_for_visit = ctk.CTkEntry(visit_tab, placeholder_text="Enter reason for visit")     
+        reason_for_visit.grid(row=3, column=1, pady=10)
+        
+        actions_taken_label = ctk.CTkLabel(visit_tab, text="Actions Taken")
+        actions_taken_label.grid(row=4, column=0, pady=10, sticky="w")
+        
+        actions_taken = ctk.CTkEntry(visit_tab, placeholder_text="Enter any actions taken")     
+        actions_taken.grid(row=4, column=1, pady=10)
+        
+        save_visit_data = ctk.CTkButton(visit_tab, text="Save Visit Data", command=save_visit)
+        save_visit_data.grid(row=5, column=0, pady=10, sticky="w")
+        
+        clear_visit_data = ctk.CTkButton(visit_tab, text="Save Visit Data", command=clear_visit)
+        clear_visit_data.grid(row=5, column=2, pady=10, sticky="w")
+    
+    def save_visit():
+        raise NotImplementedError
+    
+    def clear_visit():
+        raise NotImplementedError
+        
+    visit_tab = tabview.tab("Visit Data")    
+    #for i in range(5):
+    #    visit_tab.columnconfigure(i, weight=1)
+    #for i in range(7):
+    #    visit_tab.rowconfigure(i, weight=1)
+    
+    # IF NOTHING IS DISPLAYED OR ON LOAD THEN LOAD THIS PART. 
+    # ONCE DATA HAS BEEN LOADED, THESE PARTS CAN BE REMOVED.
+    create_initial_screen()
+    
+    # Runs the main window loop
+    window.mainloop()
 
-app.mainloop()
+if __name__ == "__main__":
+    #login()
+    main_window()
