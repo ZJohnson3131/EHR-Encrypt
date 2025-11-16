@@ -352,6 +352,7 @@ def main_window():
     window.mainloop()
 
 if __name__ == "__main__":
-    #login_window()
-    admin_window()
+    
+    login_window()
+    #admin_window()
     #main_window()
