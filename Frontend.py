@@ -9,13 +9,15 @@ global logged_in_role
 
 def login_window():
     def login():
+        #FIXME Convert to grid from pack to align with other functions
         valid_login, logged_in_role = Backend.login(user_name.get(), user_pass.get())
         if valid_login:
-            # TODO Check if the logged in user is an admin or not. If admin then open a different style of window rather than a standard user. 
-            # This is where we would start destroy the login window and open the data entry windows
             messagebox.showinfo("Valid Login", f"Good Login. User logged in as: {logged_in_role}")
             window.destroy()
-            main_window()
+            if logged_in_role == "Admin":
+                admin_window()
+            else:
+                main_window()
         if not valid_login:
             messagebox.showwarning("Invalid Login", "Incorrect Username or Password. Please try again.")
         return
@@ -41,6 +43,128 @@ def login_window():
 
     window.mainloop()
 
+def admin_window():
+    def add_new_staff():
+        def add_staff_to_database():
+            successful_add = Backend.new_user(staff_user_name.get(), staff_f_name.get(), staff_l_name.get(), staff_role.get())
+            if successful_add:
+                messagebox.showinfo("Successful User Add", "New user added to database.")
+            elif not successful_add:
+                messagebox.showwarning("Unsuccessful User Add", "User already exists in database. No changes made.")
+            return
+
+        tabview.add("Add New Staff")
+        add_staff = tabview.tab("Add New Staff")
+        staff_f_name_label = ctk.CTkLabel(add_staff, text="First Name:")
+        staff_f_name_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        staff_f_name = ctk.CTkEntry(add_staff, placeholder_text="Enter First Name")
+        staff_f_name.grid(row=0, column=1, pady=10, sticky="ew")
+        
+        staff_l_name_label = ctk.CTkLabel(add_staff, text="Last Name:")
+        staff_l_name_label.grid(row=0, column=2, padx=10, pady=10, sticky="w")
+
+        staff_l_name = ctk.CTkEntry(add_staff, placeholder_text="Enter Last Name")
+        staff_l_name.grid(row=0, column=3, pady=10, sticky="ew")
+
+        staff_role_label = ctk.CTkLabel(add_staff, text="Role:")
+        staff_role_label.grid(row=0, column=4, padx=10, pady=10, sticky="w")
+
+        staff_role = ctk.CTkEntry(add_staff, placeholder_text="Enter Role")
+        staff_role.grid(row=0, column=5, pady=10, sticky="ew")
+
+        # This will be removed once I know how to create a unique username
+        staff_user_name_label = ctk.CTkLabel(add_staff, text="Username:")
+        staff_user_name_label.grid(row=5, column=2, padx=10, pady=10, sticky="w")
+
+        staff_user_name = ctk.CTkEntry(add_staff, placeholder_text="Enter Username")
+        staff_user_name.grid(row=5, column=3, pady=10, sticky="ew")
+        
+        add_button = ctk.CTkButton(add_staff, text="Add Staff", command=add_staff_to_database)
+        add_button.grid(row=1, column=1, pady=20)
+      
+    
+    def delete_existing_staff():
+        def delete_staff_from_database():
+            successful_delete = Backend.delete_user(staff_user_name.get())
+            if successful_delete:
+                messagebox.showinfo("Successful User Delete", "User removed from database.")
+            elif not successful_delete:
+                messagebox.showwarning("Unsuccessful User Delete", "User not found. No changes made.")
+            return
+        
+        tabview.add("Delete Existing Staff")
+        delete_staff = tabview.tab("Delete Existing Staff")
+        # This will be removed once I know how to create a unique username
+        staff_user_name_label = ctk.CTkLabel(delete_staff, text="Username:")
+        staff_user_name_label.grid(row=5, column=2, padx=10, pady=10, sticky="w")
+
+        staff_user_name = ctk.CTkEntry(delete_staff, placeholder_text="Enter Username")
+        staff_user_name.grid(row=5, column=3, pady=10, sticky="ew")
+
+        add_button = ctk.CTkButton(delete_staff, text="Remove Staff", command=delete_staff_from_database)
+        add_button.grid(row=1, column=1, pady=20)
+    
+    def change_staff_role():
+        def modify_role():
+            role_change = Backend.change_role(staff_user_name.get(),staff_role.get())
+            if role_change:
+                messagebox.showinfo("Successful Role Change", "User role modified.")
+            elif not role_change:
+                messagebox.showwarning("Unsuccessful Role Change", "User not found. No changes made.")
+            return
+        
+        tabview.add("Change Staff Role")
+        staff_role = tabview.tab("Change Staff Role")
+
+        staff_role_label = ctk.CTkLabel(staff_role, text="Role:")
+        staff_role_label.grid(row=0, column=4, padx=10, pady=10, sticky="w")
+
+        staff_role = ctk.CTkEntry(staff_role, placeholder_text="Enter Role")
+        staff_role.grid(row=0, column=5, pady=10, sticky="ew")
+        
+        staff_user_name_label = ctk.CTkLabel(staff_role, text="Username:")
+        staff_user_name_label.grid(row=5, column=2, padx=10, pady=10, sticky="w")
+
+        staff_user_name = ctk.CTkEntry(staff_role, placeholder_text="Enter Username")
+        staff_user_name.grid(row=5, column=3, pady=10, sticky="ew")
+
+        add_button = ctk.CTkButton(staff_role, text="Add New Staff", command=modify_role)
+        add_button.grid(row=1, column=1, pady=20)
+
+# Patient Records will require searching by First and Last name, then allow the individual to pick the unique patient. 
+# For visit removals, a second search record with all visits associated with the individual selected should appear. 
+    def delete_patient_record():
+        tabview.add("Delete Patient Record")
+
+    def delete_patient_visit():
+        tabview.add("Delete Patient Visit")
+
+    window = ctk.CTk()
+    window.geometry("900x600")
+    window.title("Monash University Secured Electronic Health Record")
+
+    window.rowconfigure(0, weight=1)
+    window.columnconfigure(0, weight=1)
+    
+    frame = ctk.CTkFrame(window)
+    frame.grid(row=0, column=0, sticky="nsew")
+    
+    frame.rowconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1)
+
+    tabview = ctk.CTkTabview(master=frame)
+    tabview.grid(row=0, column=0, sticky="nsew")
+
+    add_new_staff()
+    delete_existing_staff()
+    change_staff_role()
+    delete_patient_record()
+    delete_patient_visit()
+
+    window.mainloop()
+    pass
+
 def main_window():
     def find_users():
         # TODO Will be used to search the database and return all users that match with the First and Last name passed in
@@ -53,41 +177,11 @@ def main_window():
         tabview.set("Patient Data")
     
     def delete_existing_patient():
-        f_name = search_f_name.get()
-        l_name = search_l_name.get()
-        
-        results = Backend.search_patients(f_name, l_name, "Admin")
-        
-        result_window = ctk.CTkToplevel()
-        result_window.title("Search Results")
-        result_window.geometry("300x300")
-        
-        ctk.CTkLabel(result_window, text="Select a Person").pack(pady=10)
-
-        listbox = ctk.CTkScrollableFrame(result_window, width=250, height=200)
-        listbox.pack(padx=10, pady=10)
-
-        for person in results:
-            display_name = f"{person[1]} {person[2]}"
-            btn = ctk.CTkButton(
-                listbox, 
-                text=display_name,
-                command=select_person(person, result_window)
-#                command=lambda p=person: select_person(p, result_window)
-            )
-            btn.pack(pady=5, fill="x")
-
-        print(results)
+        raise NotImplementedError
 
 
     def select_person(person, window):
-        window.destroy()
-        details_text = f"ID: {person['id']}\nFirst Name: {person['first_name']}\nLast Name: {person['last_name']}\nAge: {person['age']}"
-        details_text.delete("1.0", "end")
-        details_text.insert("1.0", details_text)
-
-        
-        tabview.set("Details")
+        raise NotImplementedError
     
     window = ctk.CTk()
     window.geometry("900x600")
@@ -99,7 +193,6 @@ def main_window():
     frame = ctk.CTkFrame(window)
     frame.grid(row=0, column=0, sticky="nsew")
     
-    # Grid expansion for frame
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
     
@@ -109,7 +202,7 @@ def main_window():
     tabview.add("Patient Search")
     tabview.add("Patient Data")
     tabview.add("Visit Data")
-    tabview.set("Patient Search")  # set currently visible tab
+    tabview.set("Patient Search")
     
     # PATIENT SEARCH TAB
     search_tab = tabview.tab("Patient Search")
@@ -146,7 +239,6 @@ def main_window():
     patient_tab = tabview.tab("Patient Data")
 
     #FIXME Work on grid values and configure values
-    # Configure tab grid
     for i in range(5):
         patient_tab.columnconfigure(i, weight=1)
     for i in range(7):
@@ -192,13 +284,13 @@ def main_window():
         visit_search.grid(row=0, column=1, pady=20)
     
     def add_new_visit():
-        # This will open a new window and
+        raise NotImplementedError
         build_visit_cells()
         
         
     
     def search_existing_visit():
-        pass
+        raise NotImplementedError
     
     
     def build_visit_cells():
@@ -253,18 +345,13 @@ def main_window():
         raise NotImplementedError
         
     visit_tab = tabview.tab("Visit Data")    
-    #for i in range(5):
-    #    visit_tab.columnconfigure(i, weight=1)
-    #for i in range(7):
-    #    visit_tab.rowconfigure(i, weight=1)
-    
-    # IF NOTHING IS DISPLAYED OR ON LOAD THEN LOAD THIS PART. 
-    # ONCE DATA HAS BEEN LOADED, THESE PARTS CAN BE REMOVED.
+
     create_initial_screen()
     
     # Runs the main window loop
     window.mainloop()
 
 if __name__ == "__main__":
-    #login()
-    main_window()
+    #login_window()
+    admin_window()
+    #main_window()
