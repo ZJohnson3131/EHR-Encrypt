@@ -283,14 +283,14 @@ def doctor_window():
 
     
     # PATIENT DATA TAB
-    #TODO Implement this
     def save_patient_details():
-        # This will need to make a call to the backend and then look at using the add_patient_record function.
+        """_summary_
+        """
         saved_patient = Backend.add_patient_record(patient_f_name.get().strip(), patient_l_name.get().strip(), patient_dob.get(), patient_address.get())
         if saved_patient is None:
-            print("duplicate entry")
+            messagebox.showwarning("Patent Not Found", "Patient already exists in database. No changes were made. ")
         else:
-            print("Patient added")
+            messagebox.showinfo("Patient Found", "Patient successfully added to database.")
     
     patient_tab = tabview.tab("Patient Data")
 
@@ -401,11 +401,13 @@ def doctor_window():
                     visit_results_button = ctk.CTkButton(returned_visit_window, text=f"{returned_visits[i][1]} {returned_visits[i][2]}, {returned_visits[i][4]}", 
                                                             command=lambda v=visit: return_visit_details(v))
                     visit_results_button.grid(row=i, pady=20)
+            else:
+                messagebox.showerror("No Visits In Database", "No existing visits found in database for this patient. Please create a new visit record first.")
         
         # TODO Will be used to search the database and return all users that match with the First and Last name passed in
         f_name = search_f_name.get()
         l_name = search_l_name.get()
-        results = Backend.search_all_patients(f_name.strip(), l_name.strip())
+        results = Backend.search_for_patient(f_name.strip(), l_name.strip())
         if len(results) > 0:
             #FIXME How do I get this window to appear on top of the initial window?
             returned_user_window = ctk.CTkToplevel()
@@ -445,9 +447,6 @@ def doctor_window():
 
         search_button = ctk.CTkButton(patient_search_window, text="Search", command=lambda: get_patient_details(search_type, patient_search_f_name, patient_search_l_name, patient_search_window))
         search_button.grid(row=2, column=1, pady=20)
-    
-    def search_existing_visit():
-        search_patient("existing")
     
     def save_visit():
         #TODO This will create a new entry in the visit records
@@ -529,7 +528,7 @@ def doctor_window():
     visit_add = ctk.CTkButton(visit_tab, text="Add New Patient Record", command=lambda: search_patient("new"))
     visit_add.grid(row=5, column = 0, pady=20)
     
-    visit_search = ctk.CTkButton(visit_tab, text="Search Existing Record", command=search_existing_visit)
+    visit_search = ctk.CTkButton(visit_tab, text="Search Existing Record", command=lambda: search_patient("existing"))
     visit_search.grid(row=5, column=1, pady=20)
     
     # Runs the main window loop

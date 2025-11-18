@@ -234,15 +234,21 @@ def get_specialist_name(username):
 def encrypt(data):
     cipher = AES.new(AES_KEY, AES.MODE_EAX)
     nonce = cipher.nonce
-    ciphertext, tag = cipher.encrypt_and_digest(data.encode())
+    if data is not None:
+        ciphertext, tag = cipher.encrypt_and_digest(data.encode())
     
-    return nonce, ciphertext, tag
+        return nonce, ciphertext, tag
+    else:
+        return None, None, None
 
 def decrypt(nonce, ciphertext, tag):
-    cipher = AES.new(AES_KEY, AES.MODE_EAX, nonce=nonce)
-    plaintext = cipher.decrypt(ciphertext)
-    cipher.verify(tag)
-    return plaintext.decode()
+    if ciphertext is not None:
+        cipher = AES.new(AES_KEY, AES.MODE_EAX, nonce=nonce)
+        plaintext = cipher.decrypt(ciphertext)
+        cipher.verify(tag)
+        return plaintext.decode()
+    else:
+        return None
 
 # Returns all patients in the database.
 def return_all_patients():
@@ -357,9 +363,7 @@ def create_db_tables(database):
         actions_taken_nonce, 
         actions_taken_encrypt, 
         actions_taken_tag, 
-        specialist_appointed_nonce 
-        specialist_appointed_encrypt 
-        specialist_appointed_tag 
+        specialist_appointed
         );
         """
     )
@@ -455,7 +459,7 @@ def add_patient_record(first_name: str, last_name, date_of_birth, address):
     lookup_db.close()
     return True
 
-#FIXME Needs some work
+#FIXME Needs some work. This will be done in the administrator functions
 def delete_patient_record(patient_id):
     if delete_visit_record(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
@@ -467,7 +471,7 @@ def delete_patient_record(patient_id):
     else:
         return False
 
-#FIXME Needs some work
+#FIXME Needs some work. This will be done in the administrator functions
 def modify_patient_record(patient_id, first_name, last_name, dob, address):
     if lookup_patient(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
@@ -481,6 +485,7 @@ def modify_patient_record(patient_id, first_name, last_name, dob, address):
     else:
         return False
 
+#TODO Update for new patient checking if need be
 def return_patient_visits(patient_id):
     if lookup_patient(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
@@ -488,26 +493,31 @@ def return_patient_visits(patient_id):
 
         create_db_tables(lookup_db)
 
-        results = lookup_cursor.execute("SELECT records.patient_id, first_name, last_name, date_of_visit, visit_description, actions_taken, specialist_appointed FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE records.patient_id = ?", (patient_id,)).fetchall()
+        results = lookup_cursor.execute("SELECT records.patient_id, first_name, last_name, date_of_visit_nonce, date_of_visit_encrypt, date_of_visit_tag, visit_description_nonce, visit_description_encrypt, visit_description_tag, actions_taken_nonce, actions_taken_encrypt, actions_taken_tag, specialist_appointed FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE records.patient_id = ?", (patient_id,)).fetchall()
 
         lookup_db.close()
         return results
     else:
-        return None
+        return []
 
 #TODO Need to include encryption for values in here.  
 #TODO Need to check for an existing entry that matches the entry attempting to be inserted. Do this in a similar way as was done for patients.
 def add_visit_record(patient_id: int, date_of_visit: str, description: str, actions_taken: str, specialist: str):
+    
     if lookup_patient(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
         lookup_cursor = lookup_db.cursor()
 
         create_db_tables(lookup_db)
-        
-        insert = """INSERT INTO records(patient_id, date_of_visit, visit_description, actions_taken, specialist_appointed)
+        date_of_visit_nonce, date_of_visit_cipher, date_of_visit_tag = encrypt(date_of_visit)
+        description_nonce, description_cipher, description_tag = encrypt(description)
+        actions_taken_nonce, actions_taken_cipher, actions_taken_tag = encrypt(actions_taken)
+        insert = """INSERT INTO records(patient_id, date_of_visit_nonce, date_of_visit_encrypt, date_of_visit_tag, visit_description_nonce, 
+        visit_description_encrypt, visit_description_tag, actions_taken_nonce, actions_taken_encrypt, actions_taken_tag, specialist_appointed)
         VALUES(?,?,?,?,?)"""
 
-        lookup_cursor.execute(insert, (patient_id, date_of_visit, description, actions_taken, specialist))
+        lookup_cursor.execute(insert, (patient_id, date_of_visit_nonce, date_of_visit_cipher, date_of_visit_tag, description_nonce, 
+                                       description_cipher, description_tag, actions_taken_nonce, actions_taken_cipher, actions_taken_tag, specialist))
         lookup_db.commit()
 
         lookup_db.close()
@@ -581,17 +591,39 @@ if __name__ == "__main__":
         address_nonce, address_cipher, address_tag = encrypt(i[3])
         
         lookup_cursor.execute(insert, (f_name, l_name, dob_nonce, dob_cipher, dob_tag, address_nonce, address_cipher, address_tag))
-    #lookup_cursor.execute(insert, ('Joe', 'Bloggs', '05/03/05', '123 Fake St, Bloomington, SA'))
-    #lookup_cursor.execute(insert, ('Peter', 'White', '12/12/75', '44 Sunny Ave, Fantasia, QLD'))
-    #lookup_cursor.execute(insert, ('Joe', 'Bloggs', '10/07/92', '1 Coal Miners Rd, Winchester, WA'))    
     
     
-    #insert = """INSERT INTO records(patient_id, date_of_visit, visit_description, actions_taken, specialist_appointed) VALUES(?,?,?,?,?)"""
-    #
-    #lookup_cursor.execute(insert, ('2', '1', 'This is a specialist appointment and should be viewable by MSpec1', None, 'MSPec1'))
-    #lookup_cursor.execute(insert, ('2', '1', 'This does not have a specialist and should not be viewable', None, None))
-    #lookup_cursor.execute(insert, ('4', '1', 'Only this for Joe Bloggs 2 should be viewable by OSpec1', None, 'OSpec1'))
-    #lookup_cursor.execute(insert, ('2', '1', 'This should only be viewable by OSpec1', None, 'OSpec1'))
+    records = [(2, '1', 'This is a specialist appointment and should be viewable by MSpec1', None, 'MSPec1'),
+               (2, '1', 'This does not have a specialist and should not be viewable', None, None),
+               (4, '1', 'Only this for Joe Bloggs 2 should be viewable by OSpec1', None, 'OSpec1'),
+               (2, '1', 'This should only be viewable by OSpec1', None, 'OSpec1')
+    ]
+
+    insert = """INSERT INTO records(
+        patient_id, 
+        date_of_visit_nonce,
+        date_of_visit_encrypt,
+        date_of_visit_tag,
+        visit_description_nonce,
+        visit_description_encrypt,
+        visit_description_tag,
+        actions_taken_nonce, 
+        actions_taken_encrypt, 
+        actions_taken_tag, 
+        specialist_appointed
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?)"""
+
+    for i in records:
+        patient_id = i[0]
+        specialist = i[4]
+        visit_date_nonce, visit_date_cipher, visit_date_tag = encrypt(i[1])
+        description_nonce, description_cipher, description_tag = encrypt(i[2])
+        actions_taken_nonce, actions_taken_cipher, actions_taken_tag = encrypt(i[3])
+        #FIXME Why isnt specialist populating in database
+        print(specialist)
+        lookup_cursor.execute(insert, (patient_id, visit_date_nonce, visit_date_cipher, visit_date_tag, description_nonce, description_cipher, description_tag, actions_taken_nonce, actions_taken_cipher, actions_taken_tag, specialist))
+
+
     
     
     lookup_db.commit()
