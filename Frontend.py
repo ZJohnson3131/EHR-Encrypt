@@ -5,6 +5,12 @@ import Backend
 #https://www.geeksforgeeks.org/python/create-a-modern-login-ui-using-customtkinter-module-in-python/
 #https://customtkinter.tomschimansky.com/documentation/widgets/tabview/
 
+#TODO 
+# Find out how to get searched staff and patients to be selectable. 
+# Populate entry fields with relative data. 
+# Create a log of who made changes and when. 
+# How can I create a logout option for users that closes the current window and takes them back to the login_window()?
+
 global logged_in_role
 
 def login_window():
@@ -16,8 +22,10 @@ def login_window():
             window.destroy()
             if logged_in_role == "Admin":
                 admin_window()
+            elif logged_in_role == "Specialist":
+                specialist_window()
             else:
-                main_window()
+                doctor_window()
         if not valid_login:
             messagebox.showwarning("Invalid Login", "Incorrect Username or Password. Please try again.")
         return
@@ -163,26 +171,65 @@ def admin_window():
     delete_patient_visit()
 
     window.mainloop()
-    pass
 
-def main_window():
+def doctor_window():
     def find_users():
+        def return_user_data(pers_data):
+            returned_user_window.destroy()
+            tabview.set("Patient Data")
+
+            patient_f_name.configure(state="normal")
+            patient_f_name.delete(0, "end")
+            patient_f_name.insert(0, pers_data[1])
+            patient_f_name.configure(state="readonly")
+
+            patient_l_name.configure(state="normal")
+            patient_l_name.delete(0, "end")
+            patient_l_name.insert(0, pers_data[2])
+            patient_l_name.configure(state="readonly")
+
+            patient_address.configure(state="normal")
+            patient_address.delete(0, "end")
+            patient_address.insert(0, pers_data[4])
+            patient_address.configure(state="readonly")
+
+            patient_dob.configure(state="normal")
+            patient_dob.delete(0, "end")
+            patient_dob.insert(0, pers_data[3])
+            patient_dob.configure(state="readonly")            
+
         # TODO Will be used to search the database and return all users that match with the First and Last name passed in
         f_name = search_f_name.get()
         l_name = search_l_name.get()
-        results = Backend.search_patients(f_name, l_name, "Admin")
-        print(results)
+        results = Backend.search_all_patients(f_name.strip(), l_name.strip())
+        if len(results) > 0:
+            #FIXME How do I get this window to appear on top of the initial window?
+            returned_user_window = ctk.CTkToplevel()
+            returned_user_window.geometry("900x600")
+            returned_user_window.title("Searched Users")
+            for i in range(len(results)):
+                patient = results[i]
+                search_results_button = ctk.CTkButton(returned_user_window, text=f"{results[i][1]} {results[i][2]}, {results[i][4]}", 
+                                                      command=lambda p=patient: return_user_data(p))
+                search_results_button.grid(row=i, pady=20)
+        else:
+            messagebox.showwarning("No Users Found", "No users with that name were found. Please try again.")
         
     def add_new_patient():
         tabview.set("Patient Data")
-    
-    def delete_existing_patient():
-        raise NotImplementedError
 
+        patient_f_name.configure(state="normal")
+        patient_f_name.delete(0, "end")
 
-    def select_person(person, window):
-        raise NotImplementedError
-    
+        patient_l_name.configure(state="normal")
+        patient_l_name.delete(0, "end")
+
+        patient_address.configure(state="normal")
+        patient_address.delete(0, "end")
+
+        patient_dob.configure(state="normal")
+        patient_dob.delete(0, "end")        
+
     window = ctk.CTk()
     window.geometry("900x600")
     window.title("Monash University Secured Electronic Health Record")
@@ -198,6 +245,7 @@ def main_window():
     
     tabview = ctk.CTkTabview(master=frame)
     tabview.grid(row=0, column=0, sticky="nsew")
+
 
     tabview.add("Patient Search")
     tabview.add("Patient Data")
@@ -224,18 +272,21 @@ def main_window():
     search_l_name = ctk.CTkEntry(search_tab, placeholder_text="Enter Last Name")
     search_l_name.grid(row=0, column=3, pady=10, sticky="ew")
     
+    #TODO Work on this
     search_button = ctk.CTkButton(search_tab, text="Search", command=find_users)
     search_button.grid(row=1, column=1, pady=20)
     
     add_button = ctk.CTkButton(search_tab, text="Add New Patient", command=add_new_patient)
     add_button.grid(row=1, column=0, pady=20)
-    
-    delete_button = ctk.CTkButton(search_tab, text="Delete Patient Record", command=delete_existing_patient)
-    delete_button.grid(row=1, column=2, pady=20)
+
+
     
     # PATIENT DATA TAB
+    #TODO Implement this
     def save_patient_details():
+        # This will need to make a call to the backend and then look at using the add_patient_record function.
         raise NotImplementedError
+    
     patient_tab = tabview.tab("Patient Data")
 
     #FIXME Work on grid values and configure values
@@ -274,24 +325,301 @@ def main_window():
     
 
     # PATIENT VISIT TAB
-    def create_initial_screen():
-        visit_tab = tabview.tab("Visit Data") 
-            
-        visit_add = ctk.CTkButton(visit_tab, text="Add New Patient Record", command=add_new_visit)
-        visit_add.grid(row=0, column = 0, pady=20)
+    def get_patient_details(search_type, search_f_name, search_l_name, window):
+        def return_patient_details(pers_data):
+            returned_user_window.destroy()
+            patient_f_name.configure(state="normal")
+            patient_f_name.delete(0, "end")
+            patient_f_name.insert(0, pers_data[1])
+            patient_f_name.configure(state="readonly")
+
+            patient_l_name.configure(state="normal")
+            patient_l_name.delete(0, "end")
+            patient_l_name.insert(0, pers_data[2])
+            patient_l_name.configure(state="readonly")
         
-        visit_search = ctk.CTkButton(visit_tab, text="Search Existing Record", command=search_existing_visit)
-        visit_search.grid(row=0, column=1, pady=20)
+        def return_patient_visits(pers_data):
+            def return_visit_details(visit_data):
+                print(visit_data)
+                returned_visit_window.destroy()
+                
+                patient_f_name.configure(state="normal")
+                patient_f_name.delete(0, "end")
+                patient_f_name.insert(0, visit_data[1])
+                patient_f_name.configure(state="readonly")
+
+                patient_l_name.configure(state="normal")
+                patient_l_name.delete(0, "end")
+                patient_l_name.insert(0, visit_data[2])
+                patient_l_name.configure(state="readonly")
+
+                date_of_visit.configure(state="normal")
+                date_of_visit.delete(0, "end")
+                date_of_visit.insert(0, visit_data[3])
+                date_of_visit.configure(state="readonly")
+                
+                reason_for_visit.configure(state="normal")
+                reason_for_visit.delete(0, "end")
+
+                if visit_data[4] is not None:
+                    reason_for_visit.insert(0, visit_data[4])
+                    reason_for_visit.configure(state="readonly")
+                else:
+                    reason_for_visit.insert(0, "")
+                    reason_for_visit.configure(state="readonly")
+
+                if visit_data[5] is not None:
+                    actions_taken.insert(0, visit_data[5])
+                    actions_taken.configure(state="readonly")
+                else:
+                    actions_taken.insert(0, "")
+                    actions_taken.configure(state="readonly")    
+
+                #TODO Still need to link back to Specialist first and last name
+                specialist_appointed.configure(state="normal")
+                specialist_appointed.delete(0, "end")
+                specialist_appointed.insert(0, Backend.get_specialist_name(visit_data[6]))
+                specialist_appointed.configure(state="readonly")
+
+            #TODO Link the patient_id with all existing records and then return the visits as required.
+            returned_visits = Backend.return_patient_visits(pers_data[0])
+            returned_user_window.destroy()
+
+            if len(returned_visits) > 0:
+                 #FIXME How do I get this window to appear on top of the initial window?
+                returned_visit_window = ctk.CTkToplevel()
+                returned_visit_window.geometry("900x600")
+                returned_visit_window.title("Searched Visits")
+                for i in range(len(returned_visits)):
+                    visit = returned_visits[i]
+                    visit_results_button = ctk.CTkButton(returned_visit_window, text=f"{returned_visits[i][1]} {returned_visits[i][2]}, {returned_visits[i][4]}", 
+                                                            command=lambda v=visit: return_visit_details(v))
+                    visit_results_button.grid(row=i, pady=20)
+        
+        # TODO Will be used to search the database and return all users that match with the First and Last name passed in
+        f_name = search_f_name.get()
+        l_name = search_l_name.get()
+        results = Backend.search_all_patients(f_name.strip(), l_name.strip())
+        if len(results) > 0:
+            #FIXME How do I get this window to appear on top of the initial window?
+            returned_user_window = ctk.CTkToplevel()
+            returned_user_window.geometry("900x600")
+            returned_user_window.title("Searched Users")
+            for i in range(len(results)):
+                patient = results[i]
+                if search_type == "new":
+                    search_results_button = ctk.CTkButton(returned_user_window, text=f"{results[i][1]} {results[i][2]}, {results[i][4]}", 
+                                                        command=lambda p=patient: return_patient_details(p))
+                elif search_type == "existing":
+                    #FIXME From here we need to open yet another window for finding patients with existing records. 
+                    search_results_button = ctk.CTkButton(returned_user_window, text=f"{results[i][1]} {results[i][2]}, {results[i][4]}", 
+                                    command=lambda p=patient: return_patient_visits(p))
+                
+                search_results_button.grid(row=i, pady=20)
+        else:
+            messagebox.showwarning("No Users Found", "No users with that name were found. Please try again.")
+        window.destroy()
     
-    def add_new_visit():
-        raise NotImplementedError
-        build_visit_cells()
-        
-        
+    def search_patient(search_type):
+        #TODO This will open a new window for the user to select a person and then populate their initial data from there.
+        patient_search_window = ctk.CTkToplevel()
+        patient_search_window.geometry("900x600")
+
+        patient_search_f_name_label = ctk.CTkLabel(patient_search_window, text="First Name:")
+        patient_search_f_name_label.grid(row=1, column=0, pady=10, sticky="w")
+
+        patient_search_f_name = ctk.CTkEntry(patient_search_window, placeholder_text="Enter First Name")
+        patient_search_f_name.grid(row=1, column=1, pady=10, sticky="ew")
+
+        patient_search_l_name_label = ctk.CTkLabel(patient_search_window, text="Last Name:")
+        patient_search_l_name_label.grid(row=1, column=2, pady=10, sticky="w")
+
+        patient_search_l_name = ctk.CTkEntry(patient_search_window, placeholder_text="Enter Last Name")
+        patient_search_l_name.grid(row=1, column=3, pady=10, sticky="ew")
+
+        search_button = ctk.CTkButton(patient_search_window, text="Search", command=lambda: get_patient_details(search_type, patient_search_f_name, patient_search_l_name, patient_search_window))
+        search_button.grid(row=2, column=1, pady=20)
     
     def search_existing_visit():
+        search_patient("existing")
+    
+    def save_visit():
+        #TODO This will create a new entry in the visit records
+        #TODO Need to find a way to capture and maintain patient_id. 
         raise NotImplementedError
     
+    def clear_visit(): 
+        patient_f_name.configure(state="normal")
+        patient_f_name.delete(0,"end")
+        patient_f_name.configure(state="readonly")
+        
+
+        patient_l_name.configure(state="normal")
+        patient_l_name.delete(0,"end")
+        patient_l_name.configure(state="readonly")
+        
+        date_of_visit.configure(state="normal")
+        date_of_visit.delete(0,"end")
+        date_of_visit.configure(state="readonly")
+        
+        specialist_appointed.configure(state="normal")
+        specialist_appointed.delete(0,"end")
+        specialist_appointed.configure(state="readonly")
+        
+        reason_for_visit.configure(state="normal")
+        reason_for_visit.delete(0,"end")
+        reason_for_visit.configure(state="readonly")
+        
+        actions_taken.configure(state="normal")
+        actions_taken.delete(0,"end")
+        actions_taken.configure(state="readonly")
+        
+    visit_tab = tabview.tab("Visit Data")
+        
+    patient_f_name_label = ctk.CTkLabel(visit_tab, text="First Name:")
+    patient_f_name_label.grid(row=1, column=0, pady=10, sticky="w")
+
+    patient_f_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter First Name")
+    patient_f_name.grid(row=1, column=1, pady=10, sticky="ew")
+
+    patient_l_name_label = ctk.CTkLabel(visit_tab, text="Last Name:")
+    patient_l_name_label.grid(row=1, column=2, pady=10, sticky="w")
+
+    patient_l_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter Last Name")
+    patient_l_name.grid(row=1, column=3, pady=10, sticky="ew")
+
+    date_of_visit_label = ctk.CTkLabel(visit_tab, text="Date of Visit")
+    date_of_visit_label.grid(row=2, column=0, pady=10, sticky="w")   
+    
+    date_of_visit = ctk.CTkEntry(visit_tab, placeholder_text="This will become a selectable box for the date")     
+    date_of_visit.grid(row=2, column=1, pady=10)
+    
+    specialist_appointed_label = ctk.CTkLabel(visit_tab, text="Specialist Appointed")
+    specialist_appointed_label.grid(row=2, column=2, pady=10, sticky="w")
+    
+    specialist_appointed = ctk.CTkEntry(visit_tab, placeholder_text="Please Select Specialist, This should be a drop-down populated with all specialist names in database")     
+    specialist_appointed.grid(row=2, column=3, pady=10)
+    
+    reason_for_visit_label = ctk.CTkLabel(visit_tab, text="Reason for Visit")
+    reason_for_visit_label.grid(row=3, column=0, pady=10, sticky="w")
+    
+    #FIXME This needs to be across the full length of the window and multiple lines
+    reason_for_visit = ctk.CTkEntry(visit_tab, placeholder_text="Enter reason for visit")     
+    reason_for_visit.grid(row=3, column=1, pady=10)
+    
+    actions_taken_label = ctk.CTkLabel(visit_tab, text="Actions Taken")
+    actions_taken_label.grid(row=4, column=0, pady=10, sticky="w")
+    
+    #FIXME This needs to be across the full length of the window and multiple lines
+    actions_taken = ctk.CTkEntry(visit_tab, placeholder_text="Enter any actions taken")     
+    actions_taken.grid(row=4, column=1, pady=10)
+    
+    save_visit_data = ctk.CTkButton(visit_tab, text="Save Visit Data", command=save_visit)
+    save_visit_data.grid(row=5, column=3, pady=10, sticky="w")
+    
+    clear_visit_data = ctk.CTkButton(visit_tab, text="Clear Visit Data", command=clear_visit)
+    clear_visit_data.grid(row=5, column=4, pady=10, sticky="w")
+
+    visit_add = ctk.CTkButton(visit_tab, text="Add New Patient Record", command=lambda: search_patient("new"))
+    visit_add.grid(row=5, column = 0, pady=20)
+    
+    visit_search = ctk.CTkButton(visit_tab, text="Search Existing Record", command=search_existing_visit)
+    visit_search.grid(row=5, column=1, pady=20)
+    
+    # Runs the main window loop
+    window.mainloop()
+
+def specialist_window():
+    def find_users():
+        pass
+        #def return_user_data(pers_data):
+            #returned_user_window.destroy()
+            #tabview.set("Patient Data")
+#
+            #patient_f_name.configure(state="normal")
+            #patient_f_name.delete(0, "end")
+            #patient_f_name.insert(0, pers_data[1])
+            #patient_f_name.configure(state="readonly")
+#
+            #patient_l_name.configure(state="normal")
+            #patient_l_name.delete(0, "end")
+            #patient_l_name.insert(0, pers_data[2])
+            #patient_l_name.configure(state="readonly")           
+
+        # TODO Will be used to search the database and return all users that match with the First and Last name passed in
+        #f_name = search_f_name.get()
+        #l_name = search_l_name.get()
+        #results = Backend.search_all_patients(f_name.strip(), l_name.strip())
+        #if len(results) > 0:
+            #FIXME How do I get this window to appear on top of the initial window?
+            #returned_user_window = ctk.CTkToplevel()
+            #returned_user_window.geometry("900x600")
+            #returned_user_window.title("Searched Users")
+            #for i in range(len(results)):
+                #patient = results[i]
+                #search_results_button = ctk.CTkButton(returned_user_window, text=f"{results[i][1]} {results[i][2]}, {results[i][4]}", 
+                #                                      command=lambda p=patient: return_user_data(p))
+                #search_results_button.grid(row=i, pady=20)
+
+        
+    #TODO Implement this
+    def select_person(person, window):
+        raise NotImplementedError
+    
+    window = ctk.CTk()
+    window.geometry("900x600")
+    window.title("Monash University Secured Electronic Health Record")
+    
+    window.rowconfigure(0, weight=1)
+    window.columnconfigure(0, weight=1)
+    
+    frame = ctk.CTkFrame(window)
+    frame.grid(row=0, column=0, sticky="nsew")
+    
+    frame.rowconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1)
+    
+    tabview = ctk.CTkTabview(master=frame)
+    tabview.grid(row=0, column=0, sticky="nsew")
+
+
+    tabview.add("Patient Search")
+    tabview.add("Visit Data")
+    tabview.set("Patient Search")
+    
+    # PATIENT SEARCH TAB
+    search_tab = tabview.tab("Patient Search")
+    
+    for i in range(4):
+        search_tab.columnconfigure(i, weight=1)
+    for i in range(2):
+        search_tab.rowconfigure(i, weight=1)
+        
+    search_f_name_label = ctk.CTkLabel(search_tab, text="First Name:")
+    search_f_name_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+    search_f_name = ctk.CTkEntry(search_tab, placeholder_text="Enter First Name")
+    search_f_name.grid(row=0, column=1, pady=10, sticky="ew")
+    
+    search_l_name_label = ctk.CTkLabel(search_tab, text="Last Name:")
+    search_l_name_label.grid(row=0, column=2, padx=10, pady=10, sticky="w")
+
+    search_l_name = ctk.CTkEntry(search_tab, placeholder_text="Enter Last Name")
+    search_l_name.grid(row=0, column=3, pady=10, sticky="ew")
+    
+    #TODO Work on this
+    search_button = ctk.CTkButton(search_tab, text="Search", command=find_users)
+    search_button.grid(row=1, column=1, pady=20)
+    
+    # PATIENT VISIT TAB
+    def create_initial_screen():
+        visit_tab = tabview.tab("Visit Data") 
+        
+        visit_search = ctk.CTkButton(visit_tab, text="Search Existing Record", command=search_existing_visit)
+        visit_search.grid(row=0, column=1, pady=20)      
+        
+    def search_existing_visit():
+        raise NotImplementedError    
     
     def build_visit_cells():
         visit_tab = tabview.tab("Visit Data")
@@ -334,14 +662,8 @@ def main_window():
         
         save_visit_data = ctk.CTkButton(visit_tab, text="Save Visit Data", command=save_visit)
         save_visit_data.grid(row=5, column=0, pady=10, sticky="w")
-        
-        clear_visit_data = ctk.CTkButton(visit_tab, text="Save Visit Data", command=clear_visit)
-        clear_visit_data.grid(row=5, column=2, pady=10, sticky="w")
     
     def save_visit():
-        raise NotImplementedError
-    
-    def clear_visit():
         raise NotImplementedError
         
     visit_tab = tabview.tab("Visit Data")    

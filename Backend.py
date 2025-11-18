@@ -1,6 +1,8 @@
-import json
+from Crypto.Cipher import AES
+from secrets import token_bytes
 import sqlite3
 from argon2 import PasswordHasher
+import os
 
 # Hashing passwords: https://www.geeksforgeeks.org/python/how-to-hash-passwords-in-python/
 # SQLite3 Table Creation: https://www.sqlitetutorial.net/sqlite-python/creating-tables/
@@ -8,22 +10,29 @@ from argon2 import PasswordHasher
 # SQLite3 Table Creation: https://sqlite.org/withoutrowid.html
 
 
-#TODO
-# Work on searching for individuals. Once found, work out how best to pass them back to the frontend functions and display.
-# Work on role-based logins to limit information allowed for users to access when they login.
-# Login function needs to also return the role of the user, this can then be saved in a global variable in the frontend for restricting access to files 
-# Make sure all staff functions are updated for SQLite database
+#TODO 
+# Check backend functionality for add, modify and remove entries (Look to build tests for these). 
+# Create unique usernames for staff. 
+# Develop table joins for adding patient visits. 
+# Recall patients and visits from functions. 
+# Encrypt and decrypt patient and visit data. 
 
-# TODO Create Database load script to build an initial database for an external user including patients, staff and visit records.
-
-# Might need to build a find user function
-# Start understanding what data to put into the database and how to build a SQLite database for housing data. 
-# Store all data in PT for now before creating CT storage
-# Work out how to store records of who modifies data and what was modified.
 
 global lookup_db
 
-#FIXME Make sure all SQL lookups are closing the database prior to returning the function.
+ENCRYPTION_KEY = "aes.key"
+
+def load_aes_key():
+    if os.path.exists(ENCRYPTION_KEY):
+        with open(ENCRYPTION_KEY, "rb") as k:
+            return k.read()
+    else:
+        aes_key = token_bytes(32)
+        with open(ENCRYPTION_KEY, "wb") as k:
+            return k.write(aes_key)
+        return aes_key
+
+AES_KEY = load_aes_key()
 
 # TODO Build Test
 def new_user(username: str, f_name: str, l_name: str, role: str):
@@ -205,25 +214,39 @@ def login(username: str, password: str):
         password_check = lookup_cursor.fetchone()
         if ph.verify(password_check[0], password):
             role = lookup_cursor.execute("SELECT role FROM staff WHERE user_name = ?", (username,)).fetchone()
+            print(role[0])
             return True, role[0]
         else:
             return False, None
     else:
         return False, None
 
-    ph = PasswordHasher()
+def get_specialist_name(username):
+    #FIXME Work out why this isn't returning properly
+    lookup_db = sqlite3.connect("lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
+    print(username)
+    if lookup_user(username):
+        specialist = lookup_cursor.execute("SELECT first_name, last_name FROM staff WHERE role = Specialist AND UPPER(user_name) = ?", (username.upper(),)).fetchone()
+        print(specialist)
+        return f"{specialist[0]} {specialist[1]}"
+    else:
+        return "No Specialist"
 
-    with open("login.json", "r") as file:
-        users = json.load(file)
+#################################################################
+def encrypt(data):
+    cipher = AES.new(AES_KEY, AES.MODE_EAX)
+    nonce = cipher.nonce
+    ciphertext, tag = cipher.encrypt_and_digest(data.encode())
     
-    for user in users["logins"]:
-        try:
-            if user["username"].lower() == username and ph.verify(user["password"], password):
-                return True, user["role"]
-            else:
-                continue
-        except Exception:
-            return False
+    return nonce, ciphertext, tag
+
+def decrypt(nonce, ciphertext, tag):
+    cipher = AES.new(AES_KEY, AES.MODE_EAX, nonce=nonce)
+    plaintext = cipher.decrypt(ciphertext)
+    cipher.verify(tag)
+    return plaintext.decode()
 
 # Returns all patients in the database.
 def return_all_patients():
@@ -249,18 +272,30 @@ def lookup_patient(patient_id):
     else:    
         return True
 
-def search_patients(f_name, l_name, search_role):
+def search_all_patients(f_name, l_name):
     # FIXME Still needs some work on how to appropriately link specialists with patient records.
     # Will likely need a join of some form between the staff, visits and patients tables. 
     lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
     create_db_tables(lookup_db)
 
-    if search_role == "Dcotor" or search_role == "Admin":
-        lookup_cursor.execute("SELECT * FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+    lookup_cursor.execute("SELECT * FROM patients WHERE UPPER(first_name) = ? AND UPPER(last_name) = ?", (f_name.upper(), l_name.upper()))
 
-    elif search_role == "Specialist":
-        lookup_cursor.execute("SELECT * FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+    search_results = lookup_cursor.fetchall()
+
+    lookup_db.close()
+
+    return search_results
+
+def search__specialist_patients(f_name, l_name):
+    # FIXME Still needs some work on how to appropriately link specialists with patient records.
+    # Will likely need a join of some form between the staff, visits and patients tables. 
+    lookup_db = sqlite3.connect("lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    create_db_tables(lookup_db)
+
+    lookup_cursor.execute("SELECT * FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+
     search_results = lookup_cursor.fetchall()
 
     lookup_db.close()
@@ -281,15 +316,13 @@ def return_all_records():
 
     return search_results
 
-#TODO This will return all records that the specialist is associated with. 
-# Maybe I need to consider searching by patient_id to return all records for a particular patient that they have been referred to the particular specialist for.
 def return_specialist_records(specialist_name: str):
-    lookup_db = sqlite3.connect("Lookup.db")
+    lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
     create_db_tables(lookup_db)
 
-    search_sql = "SELECT * FROM records WHERE specialist_appointed = ?"
-    lookup_cursor.execute("SELECT * FROM records WHERE specialist_appointed = ?", (specialist_name,))
+    lookup_cursor.execute(
+        "SELECT patients.first_name, patients.last_name, date_of_visit, visit_description FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE specialist_appointed = ?", (specialist_name,))
     
     search_results = lookup_cursor.fetchall()
 
@@ -304,10 +337,18 @@ def create_db_tables(database):
     lookup_cursor.execute(
         """CREATE TABLE IF NOT EXISTS patients (
         patient_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        first_name ,
-        last_name ,
-        date_of_birth ,
-        address 
+        first_name_nonce ,
+        first_name_encrypt ,
+        first_name_tag ,
+        last_name_nonce ,
+        last_name _encrypt,
+        last_name _tag,
+        date_of_birth_nonce,
+        date_of_birth_encrypt,
+        date_of_birth_tag,
+        address_nonce,
+        address_encrypt,
+        address_tag 
         ); """
     )
     
@@ -315,9 +356,18 @@ def create_db_tables(database):
         """CREATE TABLE IF NOT EXISTS records (
         visit_id INTEGER PRIMARY KEY AUTOINCREMENT,
         patient_id INTEGER, 
-        date_of_visit ,
-        visit_description ,
-        specialist_appointed 
+        date_of_visit_nonce,
+        date_of_visit_encrypt,
+        date_of_visit_tag,
+        visit_description_nonce,
+        visit_description_encrypt,
+        visit_description_tag,
+        actions_taken_nonce, 
+        actions_taken_encrypt, 
+        actions_taken_tag, 
+        specialist_appointed_nonce 
+        specialist_appointed_encrypt 
+        specialist_appointed_tag 
         );
         """
     )
@@ -340,14 +390,16 @@ def add_patient_record(first_name: str, last_name, date_of_birth, address):
 
     create_db_tables(lookup_db)
 
-    lookup_cursor.execute("SELECT count(*) FROM patients WHERE first_name = ? AND last_name = ? AND address = ?", (first_name, last_name, address))
-    data=lookup_cursor.fetchall()
+    lookup_cursor.execute("SELECT patient_id FROM patients WHERE first_name = ? AND last_name = ? AND address = ?", (first_name, last_name, address))
+    data=lookup_cursor.fetchall()[0][0]
     
+    print(data)
+
     #TODO This is where I need to encrypt the data prior to storage
-    en_f_name = first_name
-    en_l_name = last_name
-    en_dob = date_of_birth
-    en_address = address
+    en_f_name = first_name.upper()
+    en_l_name = last_name.upper()
+    en_dob = date_of_birth.upper()
+    en_address = address.upper()
 
     if len(data)==0:
         insert = """INSERT INTO patients(first_name, last_name, date_of_birth, address)
@@ -360,19 +412,6 @@ def add_patient_record(first_name: str, last_name, date_of_birth, address):
 
     lookup_db.close()
     return
-
-def delete_visit_record(patient_id):
-    if lookup_patient(patient_id):
-        lookup_db = sqlite3.connect("lookup.db")
-        lookup_cursor = lookup_db.cursor()
-        # FIXME Need to create a unique username or find a way of generating this within the SQL Database.
-        lookup_cursor.execute("DELETE FROM records WHERE patient_id = ?", (patient_id,))
-        lookup_db.commit()
-        lookup_db.close()
-        return True        
-    else:
-        return False
-
 
 def delete_patient_record(patient_id):
     if delete_visit_record(patient_id):
@@ -391,32 +430,55 @@ def modify_patient_record(patient_id, patient_f_name, patient_l_name, patient_do
         lookup_cursor = lookup_db.cursor()
         lookup_cursor.execute(
             "UPDATE FROM patients SET first_name = ?, last_name = ?, date_of_birth = ?, address = ? WHERE patient_id = ?", 
-            (patient_f_name,patient_l_name,patient_dob,patient_address,patient_id))
+            (patient_f_name, patient_l_name, patient_dob, patient_address, patient_id))
         lookup_db.commit()
         lookup_db.close()
         return True  
     else:
         return False
 
-#TODO Need to set a default value of "" or whatever works for a NULL value when inputting the specialist.
+def return_patient_visits(patient_id):
+    if lookup_patient(patient_id):
+        lookup_db = sqlite3.connect("lookup.db")
+        lookup_cursor = lookup_db.cursor()
+
+        create_db_tables(lookup_db)
+
+        results = lookup_cursor.execute("SELECT records.patient_id, first_name, last_name, date_of_visit, visit_description, actions_taken, specialist_appointed FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE records.patient_id = ?", (patient_id,)).fetchall()
+
+        lookup_db.close()
+        return results
+    else:
+        return None
+
 #TODO Need to include encryption for values in here.  
-#TODO Need to ensure that only patients who exist in the database can have a visit attached. 
 #TODO Need to check for an existing entry that matches the entry attempting to be inserted. Do this in a similar way as was done for patients.
-def add_visit_record(patient_id: int, date_of_visit: str, description: str, specialist: str):
+def add_visit_record(patient_id: int, date_of_visit: str, description: str, actions_taken: str, specialist: str):
     if lookup_patient(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
         lookup_cursor = lookup_db.cursor()
 
         create_db_tables(lookup_db)
         
-        insert = """INSERT INTO records(patient_id, date_of_visit, visit_description, specialist_appointed)
-        VALUES(?,?,?,?)"""
+        insert = """INSERT INTO records(patient_id, date_of_visit, visit_description, actions_taken, specialist_appointed)
+        VALUES(?,?,?,?,?)"""
 
-        lookup_cursor.execute(insert, (patient_id, date_of_visit, description, specialist))
+        lookup_cursor.execute(insert, (patient_id, date_of_visit, description, actions_taken, specialist))
         lookup_db.commit()
 
         lookup_db.close()
         return True
+    else:
+        return False
+
+def delete_visit_record(patient_id):
+    if lookup_patient(patient_id):
+        lookup_db = sqlite3.connect("lookup.db")
+        lookup_cursor = lookup_db.cursor()
+        lookup_cursor.execute("DELETE FROM records WHERE patient_id = ?", (patient_id,))
+        lookup_db.commit()
+        lookup_db.close()
+        return True        
     else:
         return False
 
@@ -427,16 +489,60 @@ def main():
     #    option = input("Press 1 to login: ")
 
     #new_user("ZJ", "Zac", "Johnson", "Admin")
-    reset_password("ZJ")
+    #reset_password("ZJ")
     #print("Enter Login Details")
-    #add_patient_record("Z", "J", "1", "2", "None")
+    #add_patient_record("Joe", "Bloggs", "05/03/05", "123 Fake St, Bloomington, SA")
 
     #add_visit_record(1, "1", "1", "ZJ")
     #add_visit_record(2, "1", "1", "")
 
-    #return_specialist_records("ZJ")
+    print(return_specialist_records("OSpec1"))
 
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+
+    lookup_db = sqlite3.connect("lookup.db")
+    lookup_cursor = lookup_db.cursor()
+    
+    lookup_cursor.execute("DROP TABLE patients")
+    lookup_cursor.execute("DROP TABLE records")
+    lookup_cursor.execute("DROP TABLE staff")
+    
+    create_db_tables(lookup_db)
+    
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('ZJohn1', 'Zachary', 'Johnson', hash_password("1234"), 'Administrator'))
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('ZJohn2', 'Zachary', 'Johnson', hash_password("1234"), 'Doctor'))
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('MSpec1', 'Mister', 'Specialist', hash_password("1234"), 'Specialist'))
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('OSpec1', 'Other', 'Specialist', hash_password("1234"), 'Specialist'))
+    
+    
+    
+    insert = """INSERT INTO patients(first_name, last_name, date_of_birth, address)
+    VALUES(?,?,?,?)"""
+    
+    lookup_cursor.execute(insert, ('Martha', 'Stewart', '01/01/99', '27 Crookswold Terrace, Richmond, NSW'))
+    lookup_cursor.execute(insert, ('Joe', 'Bloggs', '05/03/05', '123 Fake St, Bloomington, SA'))
+    lookup_cursor.execute(insert, ('Peter', 'White', '12/12/75', '44 Sunny Ave, Fantasia, QLD'))
+    lookup_cursor.execute(insert, ('Joe', 'Bloggs', '10/07/92', '1 Coal Miners Rd, Winchester, WA'))    
+    
+    
+    insert = """INSERT INTO records(patient_id, date_of_visit, visit_description, actions_taken, specialist_appointed) VALUES(?,?,?,?,?)"""
+    
+    lookup_cursor.execute(insert, ('2', '1', 'This is a specialist appointment and should be viewable by MSpec1', None, 'MSPec1'))
+    lookup_cursor.execute(insert, ('2', '1', 'This does not have a specialist and should not be viewable', None, None))
+    lookup_cursor.execute(insert, ('4', '1', 'Only this for Joe Bloggs 2 should be viewable by OSpec1', None, 'OSpec1'))
+    lookup_cursor.execute(insert, ('2', '1', 'This should only be viewable by OSpec1', None, 'OSpec1'))
+    
+    
+    lookup_db.commit()
+    lookup_db.close()
+
+    nonce, ciphertext, tag = encrypt("This is a new message")
+
+    print(ciphertext)
+
+    plaintext = decrypt(nonce, ciphertext, tag)
+
+    print(plaintext)
