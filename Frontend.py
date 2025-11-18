@@ -178,6 +178,7 @@ def doctor_window():
             returned_user_window.destroy()
             tabview.set("Patient Data")
 
+            print(pers_data)
             patient_f_name.configure(state="normal")
             patient_f_name.delete(0, "end")
             patient_f_name.insert(0, pers_data[1])
@@ -201,7 +202,7 @@ def doctor_window():
         # TODO Will be used to search the database and return all users that match with the First and Last name passed in
         f_name = search_f_name.get()
         l_name = search_l_name.get()
-        results = Backend.search_all_patients(f_name.strip(), l_name.strip())
+        results = Backend.search_for_patient(f_name.strip(), l_name.strip())
         if len(results) > 0:
             #FIXME How do I get this window to appear on top of the initial window?
             returned_user_window = ctk.CTkToplevel()
@@ -285,7 +286,11 @@ def doctor_window():
     #TODO Implement this
     def save_patient_details():
         # This will need to make a call to the backend and then look at using the add_patient_record function.
-        raise NotImplementedError
+        saved_patient = Backend.add_patient_record(patient_f_name.get().strip(), patient_l_name.get().strip(), patient_dob.get(), patient_address.get())
+        if saved_patient is None:
+            print("duplicate entry")
+        else:
+            print("Patient added")
     
     patient_tab = tabview.tab("Patient Data")
 
@@ -325,33 +330,34 @@ def doctor_window():
     
 
     # PATIENT VISIT TAB
+    #TODO Need to include a button for clearing patient data
     def get_patient_details(search_type, search_f_name, search_l_name, window):
         def return_patient_details(pers_data):
             returned_user_window.destroy()
-            patient_f_name.configure(state="normal")
-            patient_f_name.delete(0, "end")
-            patient_f_name.insert(0, pers_data[1])
-            patient_f_name.configure(state="readonly")
+            visit_f_name.configure(state="normal")
+            visit_f_name.delete(0, "end")
+            visit_f_name.insert(0, pers_data[1])
+            visit_f_name.configure(state="readonly")
 
-            patient_l_name.configure(state="normal")
-            patient_l_name.delete(0, "end")
-            patient_l_name.insert(0, pers_data[2])
-            patient_l_name.configure(state="readonly")
+            visit_l_name.configure(state="normal")
+            visit_l_name.delete(0, "end")
+            visit_l_name.insert(0, pers_data[2])
+            visit_l_name.configure(state="readonly")
         
         def return_patient_visits(pers_data):
             def return_visit_details(visit_data):
                 print(visit_data)
                 returned_visit_window.destroy()
                 
-                patient_f_name.configure(state="normal")
-                patient_f_name.delete(0, "end")
-                patient_f_name.insert(0, visit_data[1])
-                patient_f_name.configure(state="readonly")
+                visit_f_name.configure(state="normal")
+                visit_f_name.delete(0, "end")
+                visit_f_name.insert(0, visit_data[1])
+                visit_f_name.configure(state="readonly")
 
-                patient_l_name.configure(state="normal")
-                patient_l_name.delete(0, "end")
-                patient_l_name.insert(0, visit_data[2])
-                patient_l_name.configure(state="readonly")
+                visit_l_name.configure(state="normal")
+                visit_l_name.delete(0, "end")
+                visit_l_name.insert(0, visit_data[2])
+                visit_l_name.configure(state="readonly")
 
                 date_of_visit.configure(state="normal")
                 date_of_visit.delete(0, "end")
@@ -476,17 +482,17 @@ def doctor_window():
         
     visit_tab = tabview.tab("Visit Data")
         
-    patient_f_name_label = ctk.CTkLabel(visit_tab, text="First Name:")
-    patient_f_name_label.grid(row=1, column=0, pady=10, sticky="w")
+    visit_f_name_label = ctk.CTkLabel(visit_tab, text="First Name:")
+    visit_f_name_label.grid(row=1, column=0, pady=10, sticky="w")
 
-    patient_f_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter First Name")
-    patient_f_name.grid(row=1, column=1, pady=10, sticky="ew")
+    visit_f_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter First Name")
+    visit_f_name.grid(row=1, column=1, pady=10, sticky="ew")
 
-    patient_l_name_label = ctk.CTkLabel(visit_tab, text="Last Name:")
-    patient_l_name_label.grid(row=1, column=2, pady=10, sticky="w")
+    visit_l_name_label = ctk.CTkLabel(visit_tab, text="Last Name:")
+    visit_l_name_label.grid(row=1, column=2, pady=10, sticky="w")
 
-    patient_l_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter Last Name")
-    patient_l_name.grid(row=1, column=3, pady=10, sticky="ew")
+    visit_l_name = ctk.CTkEntry(visit_tab, placeholder_text="Enter Last Name")
+    visit_l_name.grid(row=1, column=3, pady=10, sticky="ew")
 
     date_of_visit_label = ctk.CTkLabel(visit_tab, text="Date of Visit")
     date_of_visit_label.grid(row=2, column=0, pady=10, sticky="w")   
