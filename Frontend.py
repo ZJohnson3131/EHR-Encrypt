@@ -11,8 +11,6 @@ import Backend
 # Create a log of who made changes and when. 
 # How can I create a logout option for users that closes the current window and takes them back to the login_window()?
 
-global logged_in_role
-
 def login_window():
     def login():
         #FIXME Convert to grid from pack to align with other functions
@@ -334,6 +332,10 @@ def doctor_window():
     def get_patient_details(search_type, search_f_name, search_l_name, window):
         def return_patient_details(pers_data):
             returned_user_window.destroy()
+            global PATIENT_ID, VISIT_ID
+            VISIT_ID = None
+            PATIENT_ID = pers_data[0]
+            print(f"Printing Patient_ID: {PATIENT_ID}")
             visit_f_name.configure(state="normal")
             visit_f_name.delete(0, "end")
             visit_f_name.insert(0, pers_data[1])
@@ -345,46 +347,53 @@ def doctor_window():
             visit_l_name.configure(state="readonly")
         
         def return_patient_visits(pers_data):
-            def return_visit_details(visit_data):
-                print(visit_data)
+            def return_visit_details(visit_data): 
+                global PATIENT_ID, VISIT_ID
+                VISIT_ID = visit_data[0]     
+                PATIENT_ID = visit_data[1]
+                visit_date = Backend.decrypt(visit_data[4], visit_data[5], visit_data[6])
+                visit_reason = Backend.decrypt(visit_data[7], visit_data[8], visit_data[9])
+                visit_actions_taken = Backend.decrypt(visit_data[10], visit_data[11], visit_data[12])
                 returned_visit_window.destroy()
                 
                 visit_f_name.configure(state="normal")
                 visit_f_name.delete(0, "end")
-                visit_f_name.insert(0, visit_data[1])
+                visit_f_name.insert(0, visit_data[2])
                 visit_f_name.configure(state="readonly")
 
                 visit_l_name.configure(state="normal")
                 visit_l_name.delete(0, "end")
-                visit_l_name.insert(0, visit_data[2])
+                visit_l_name.insert(0, visit_data[3])
                 visit_l_name.configure(state="readonly")
 
+                print(f"Date of visit: {visit_date}")
                 date_of_visit.configure(state="normal")
                 date_of_visit.delete(0, "end")
-                date_of_visit.insert(0, visit_data[3])
+                date_of_visit.insert(0, visit_date)
                 date_of_visit.configure(state="readonly")
                 
                 reason_for_visit.configure(state="normal")
                 reason_for_visit.delete(0, "end")
 
-                if visit_data[4] is not None:
-                    reason_for_visit.insert(0, visit_data[4])
+                if visit_reason is not None:
+                    reason_for_visit.insert(0, visit_reason)
                     reason_for_visit.configure(state="readonly")
                 else:
                     reason_for_visit.insert(0, "")
                     reason_for_visit.configure(state="readonly")
 
-                if visit_data[5] is not None:
-                    actions_taken.insert(0, visit_data[5])
-                    actions_taken.configure(state="readonly")
+                actions_taken.configure(state="normal")
+                actions_taken.delete(0, "end")
+
+                if visit_actions_taken is not None:
+                    actions_taken.insert(0, visit_actions_taken)
                 else:
                     actions_taken.insert(0, "")
-                    actions_taken.configure(state="readonly")    
 
                 #TODO Still need to link back to Specialist first and last name
                 specialist_appointed.configure(state="normal")
                 specialist_appointed.delete(0, "end")
-                specialist_appointed.insert(0, Backend.get_specialist_name(visit_data[6]))
+                specialist_appointed.insert(0, Backend.get_specialist_name(visit_data[13]))
                 specialist_appointed.configure(state="readonly")
 
             #TODO Link the patient_id with all existing records and then return the visits as required.
@@ -398,7 +407,9 @@ def doctor_window():
                 returned_visit_window.title("Searched Visits")
                 for i in range(len(returned_visits)):
                     visit = returned_visits[i]
-                    visit_results_button = ctk.CTkButton(returned_visit_window, text=f"{returned_visits[i][1]} {returned_visits[i][2]}, {returned_visits[i][4]}", 
+                    #Decrypts the data for displaying differences between the visits
+                    visit_date = Backend.decrypt(returned_visits[i][4], returned_visits[i][5], returned_visits[i][6])
+                    visit_results_button = ctk.CTkButton(returned_visit_window, text=f"{returned_visits[i][2]} {returned_visits[i][3]}, {visit_date}", 
                                                             command=lambda v=visit: return_visit_details(v))
                     visit_results_button.grid(row=i, pady=20)
             else:
@@ -450,18 +461,32 @@ def doctor_window():
     
     def save_visit():
         #TODO This will create a new entry in the visit records
-        #TODO Need to find a way to capture and maintain patient_id. 
-        raise NotImplementedError
+        if VISIT_ID is None:
+            # Create a new visit entry
+            #FIXME Should check if nothing is passed in for date of visit and reason for visit and push back if nothing is entered. 
+            write_new_visit = Backend.add_visit_record(PATIENT_ID, date_of_visit.get(), reason_for_visit.get(), actions_taken.get(), specialist_appointed.get())
+            if write_new_visit:
+                print("Successful add")
+            else:
+                print("Unsuccessful add")
+            pass
+        elif VISIT_ID is None:
+            # Modify an existing visit entry
+            update_existing_visit = Backend.update_visit_record(VISIT_ID, PATIENT_ID, date_of_visit.get(), reason_for_visit.get(), actions_taken.get(), specialist_appointed.get())
+            if update_existing_visit:
+                print("Successful update")
+            else:
+                print("Unsuccessful update")
     
     def clear_visit(): 
-        patient_f_name.configure(state="normal")
-        patient_f_name.delete(0,"end")
-        patient_f_name.configure(state="readonly")
+        visit_f_name.configure(state="normal")
+        visit_f_name.delete(0,"end")
+        visit_f_name.configure(state="readonly")
         
 
-        patient_l_name.configure(state="normal")
-        patient_l_name.delete(0,"end")
-        patient_l_name.configure(state="readonly")
+        visit_l_name.configure(state="normal")
+        visit_l_name.delete(0,"end")
+        visit_l_name.configure(state="readonly")
         
         date_of_visit.configure(state="normal")
         date_of_visit.delete(0,"end")

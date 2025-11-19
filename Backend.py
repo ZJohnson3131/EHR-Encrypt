@@ -150,7 +150,7 @@ def lookup_user(username):
     lookup_cursor = lookup_db.cursor()
     create_db_tables(lookup_db)
     
-    user_lookup = lookup_cursor.execute("SELECT * FROM staff WHERE user_name = ?", (username,))
+    user_lookup = lookup_cursor.execute("SELECT * FROM staff WHERE UPPER(user_name) = ?", (username.upper(),))
     if len(user_lookup.fetchall()) == 0:
         lookup_db.close()
         return False
@@ -222,10 +222,8 @@ def get_specialist_name(username):
     lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
     create_db_tables(lookup_db)
-    print(username)
     if lookup_user(username):
-        specialist = lookup_cursor.execute("SELECT first_name, last_name FROM staff WHERE role = Specialist AND UPPER(user_name) = ?", (username.upper(),)).fetchone()
-        print(specialist)
+        specialist = lookup_cursor.execute("SELECT first_name, last_name FROM staff WHERE role = ? AND UPPER(user_name) = ?", ('Specialist', username.upper())).fetchone()
         return f"{specialist[0]} {specialist[1]}"
     else:
         return "No Specialist"
@@ -493,9 +491,11 @@ def return_patient_visits(patient_id):
 
         create_db_tables(lookup_db)
 
-        results = lookup_cursor.execute("SELECT records.patient_id, first_name, last_name, date_of_visit_nonce, date_of_visit_encrypt, date_of_visit_tag, visit_description_nonce, visit_description_encrypt, visit_description_tag, actions_taken_nonce, actions_taken_encrypt, actions_taken_tag, specialist_appointed FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE records.patient_id = ?", (patient_id,)).fetchall()
+        results = lookup_cursor.execute("SELECT visit_id, records.patient_id, first_name, last_name, date_of_visit_nonce, date_of_visit_encrypt, date_of_visit_tag, visit_description_nonce, visit_description_encrypt, visit_description_tag, actions_taken_nonce, actions_taken_encrypt, actions_taken_tag, specialist_appointed FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE records.patient_id = ?", (patient_id,)).fetchall()
 
         lookup_db.close()
+
+        #FIXME Probably should move the decrypting of data from front-end (around line 400) to here and simply pass back the decrypted data.
         return results
     else:
         return []
@@ -514,7 +514,7 @@ def add_visit_record(patient_id: int, date_of_visit: str, description: str, acti
         actions_taken_nonce, actions_taken_cipher, actions_taken_tag = encrypt(actions_taken)
         insert = """INSERT INTO records(patient_id, date_of_visit_nonce, date_of_visit_encrypt, date_of_visit_tag, visit_description_nonce, 
         visit_description_encrypt, visit_description_tag, actions_taken_nonce, actions_taken_encrypt, actions_taken_tag, specialist_appointed)
-        VALUES(?,?,?,?,?)"""
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)"""
 
         lookup_cursor.execute(insert, (patient_id, date_of_visit_nonce, date_of_visit_cipher, date_of_visit_tag, description_nonce, 
                                        description_cipher, description_tag, actions_taken_nonce, actions_taken_cipher, actions_taken_tag, specialist))
@@ -524,6 +524,10 @@ def add_visit_record(patient_id: int, date_of_visit: str, description: str, acti
         return True
     else:
         return False
+
+def update_visit_record(visit_id: int, patient_id: int, date_of_visit: str, description: str, actions_taken: str, specialist: str):
+    #TODO Start working on this now. 
+    pass
 
 def delete_visit_record(patient_id):
     if lookup_patient(patient_id):
@@ -619,12 +623,7 @@ if __name__ == "__main__":
         visit_date_nonce, visit_date_cipher, visit_date_tag = encrypt(i[1])
         description_nonce, description_cipher, description_tag = encrypt(i[2])
         actions_taken_nonce, actions_taken_cipher, actions_taken_tag = encrypt(i[3])
-        #FIXME Why isnt specialist populating in database
-        print(specialist)
         lookup_cursor.execute(insert, (patient_id, visit_date_nonce, visit_date_cipher, visit_date_tag, description_nonce, description_cipher, description_tag, actions_taken_nonce, actions_taken_cipher, actions_taken_tag, specialist))
 
-
-    
-    
     lookup_db.commit()
     lookup_db.close()
