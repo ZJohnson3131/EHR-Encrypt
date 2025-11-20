@@ -14,8 +14,6 @@ import os
 # Create unique usernames for staff. 
 # Be sure to check for whitespace at the end of name strings and remove as part of checking.
 
-global lookup_db
-
 ENCRYPTION_KEY = "aes.key"
 
 def load_aes_key():
@@ -206,12 +204,11 @@ def login(username: str, password: str):
         ph = PasswordHasher()
         lookup_db = sqlite3.connect("lookup.db")
         lookup_cursor = lookup_db.cursor()
-        lookup_cursor.execute("SELECT password FROM staff WHERE user_name = ?", (username,))
+        lookup_cursor.execute("SELECT password FROM staff WHERE UPPER(user_name) = ?", (username.upper(),))
         password_check = lookup_cursor.fetchone()
         if ph.verify(password_check[0], password):
-            role = lookup_cursor.execute("SELECT role FROM staff WHERE user_name = ?", (username,)).fetchone()
-            print(role[0])
-            return True, role[0]
+            role = lookup_cursor.execute("SELECT role FROM staff WHERE UPPER(user_name) = ?", (username.upper(),)).fetchone()
+            return username, True, role[0]
         else:
             return False, None
     else:
@@ -287,20 +284,26 @@ def search_all_patients(f_name, l_name):
 
     return search_results
 
-def search__specialist_patients(f_name, l_name):
+def search__specialist_patients(f_name, l_name, specialist):
+    # Get patient_id from patients table using first and last name. 
+    # Join records table on patient_id between patients and records tables. 
+    # If the specialist is in the records table with a matching patient_id, then select those patient_id's
+    # Finally, search patient table again for all patients who match the returned patient_id list from the specialist search.
     # FIXME Still needs some work on how to appropriately link specialists with patient records.
     # Will likely need a join of some form between the staff, visits and patients tables. 
     lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
     create_db_tables(lookup_db)
 
-    lookup_cursor.execute("SELECT * FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+    specialist_patients = lookup_cursor.execute("SELECT patients.patient_id FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE UPPER(specialist_appointed) = ? AND UPPER(first_name) = ? AND UPPER(last_name) = ?", (specialist.upper(), f_name.upper(), l_name.upper())).fetchall()
+    #patient_ids = lookup_cursor.execute("SELECT patient_id FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
 
-    search_results = lookup_cursor.fetchall()
+    print(specialist_patients)
+    #search_results = lookup_cursor.fetchall()
 
     lookup_db.close()
 
-    return search_results
+    #return search_results
 
 # Returns all patient visits in the database in the database
 def return_all_records():
@@ -570,10 +573,11 @@ if __name__ == "__main__":
     
     create_db_tables(lookup_db)
 
-    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('ZJohn1', 'Zachary', 'Johnson', hash_password("1234"), 'Administrator'))
-    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('ZJohn2', 'Zachary', 'Johnson', hash_password("1234"), 'Doctor'))
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('Admin', 'Zachary', 'Johnson', hash_password("1234"), 'Administrator'))
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('Dr', 'Zachary', 'Johnson', hash_password("1234"), 'Doctor'))
     lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('MSpec1', 'Mister', 'Specialist', hash_password("1234"), 'Specialist'))
     lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('OSpec1', 'Other', 'Specialist', hash_password("1234"), 'Specialist'))
+    lookup_cursor.execute("INSERT INTO staff VALUES (?,?,?,?,?)", ('Spec', 'Test', 'Specialist', hash_password("1234"), 'Specialist'))
     
     
     
