@@ -284,7 +284,7 @@ def search_all_patients(f_name, l_name):
 
     return search_results
 
-def search__specialist_patients(f_name, l_name, specialist):
+def search_specialist_patients(f_name, l_name, specialist):
     # Get patient_id from patients table using first and last name. 
     # Join records table on patient_id between patients and records tables. 
     # If the specialist is in the records table with a matching patient_id, then select those patient_id's
@@ -295,15 +295,21 @@ def search__specialist_patients(f_name, l_name, specialist):
     lookup_cursor = lookup_db.cursor()
     create_db_tables(lookup_db)
 
-    specialist_patients = lookup_cursor.execute("SELECT patients.patient_id FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE UPPER(specialist_appointed) = ? AND UPPER(first_name) = ? AND UPPER(last_name) = ?", (specialist.upper(), f_name.upper(), l_name.upper())).fetchall()
-    #patient_ids = lookup_cursor.execute("SELECT patient_id FROM patients WHERE first_name = ? AND last_name = ?", (f_name.upper(), l_name.upper()))
+    specialist_patients = lookup_cursor.execute("SELECT * FROM records INNER JOIN patients ON records.patient_id = patients.patient_id WHERE UPPER(specialist_appointed) = ? AND UPPER(first_name) = ? AND UPPER(last_name) = ?", (specialist.upper(), f_name.upper(), l_name.upper())).fetchall()
 
-    print(specialist_patients)
-    #search_results = lookup_cursor.fetchall()
-
+    matching_patients = []
+    for i in range(len(specialist_patients)):
+        visit_id = specialist_patients[i][0]
+        patient_id = specialist_patients[i][1]
+        first_name = specialist_patients[i][13]
+        last_name = specialist_patients[i][14]
+        visit_date = decrypt(specialist_patients[i][2], specialist_patients[i][3], specialist_patients[i][4])
+        visit_description = decrypt(specialist_patients[i][5], specialist_patients[i][6], specialist_patients[i][7])
+        visit_actions = decrypt(specialist_patients[i][8], specialist_patients[i][9], specialist_patients[i][10])
+        matching_patients.append((visit_id, patient_id, first_name, last_name, visit_date, visit_description, visit_actions))
     lookup_db.close()
 
-    #return search_results
+    return matching_patients
 
 # Returns all patient visits in the database in the database
 def return_all_records():
@@ -460,11 +466,24 @@ def add_patient_record(first_name: str, last_name, date_of_birth, address):
     lookup_db.close()
     return True
 
-#FIXME Needs some work. This will be done in the administrator functions
-def delete_patient_record(patient_id):
-    if delete_visit_record(patient_id):
+######################################################################################
+#TODO Work on these three functions and then a change log and that should be all for this stuff for now. 
+def delete_visit_record(patient_id, visit_id):
+    if lookup_patient(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
         lookup_cursor = lookup_db.cursor()
+        lookup_cursor.execute("DELETE FROM records WHERE visit_id = ?", (visit_id,))
+        lookup_db.commit()
+        lookup_db.close()
+        return True        
+    else:
+        return False
+
+def delete_patient_record(patient_id):
+    if lookup_patient(patient_id):
+        lookup_db = sqlite3.connect("lookup.db")
+        lookup_cursor = lookup_db.cursor()
+        lookup_cursor.execute("DELETE FROM records WHERE patient_id = ?", (patient_id,))
         lookup_cursor.execute("DELETE FROM patients WHERE patient_id = ?", (patient_id,))
         lookup_db.commit()
         lookup_db.close()
@@ -472,19 +491,22 @@ def delete_patient_record(patient_id):
     else:
         return False
 
-#FIXME Needs some work. This will be done in the administrator functions
+#FIXME Needs some work. This will be done in the administrator functions. Will need to look at the encryption of data here as well.
 def modify_patient_record(patient_id, first_name, last_name, dob, address):
     if lookup_patient(patient_id):
+        date_of_birth_nonce, date_of_birth_encrypt, date_of_birth_tag = encrypt(dob)
+        address_nonce, address_encrypt, address_tag = encrypt(address)
         lookup_db = sqlite3.connect("lookup.db")
         lookup_cursor = lookup_db.cursor()
         lookup_cursor.execute(
-            "UPDATE FROM patients SET first_name = ?, last_name = ?, date_of_birth = ?, address = ? WHERE patient_id = ?", 
-            (first_name, last_name, dob, address, patient_id))
+            "UPDATE FROM patients SET first_name = ?, last_name = ?, date_of_birth_nonce = ?, date_of_birth_encrypt = ?, date_of_birth_tag = ?, address_nonce = ?, address_encrypt = ?, address_tag = ? WHERE patient_id = ?",
+            (first_name, last_name, date_of_birth_nonce, date_of_birth_encrypt, date_of_birth_tag, address_nonce, address_encrypt, address_tag, patient_id))
         lookup_db.commit()
         lookup_db.close()
         return True  
     else:
         return False
+###################################################################################
 
 #TODO Update for new patient checking if need be
 def return_patient_visits(patient_id):
@@ -529,40 +551,33 @@ def add_visit_record(patient_id: int, date_of_visit: str, description: str, acti
         return False
 
 def update_visit_record(visit_id: int, patient_id: int, date_of_visit: str, description: str, actions_taken: str, specialist: str):
-    #TODO Start working on this now. 
-    pass
-
-def delete_visit_record(patient_id):
     if lookup_patient(patient_id):
         lookup_db = sqlite3.connect("lookup.db")
         lookup_cursor = lookup_db.cursor()
-        lookup_cursor.execute("DELETE FROM records WHERE patient_id = ?", (patient_id,))
+
+        create_db_tables(lookup_db)
+        date_of_visit_nonce, date_of_visit_cipher, date_of_visit_tag = encrypt(date_of_visit)
+        description_nonce, description_cipher, description_tag = encrypt(description)
+        actions_taken_nonce, actions_taken_cipher, actions_taken_tag = encrypt(actions_taken)
+
+        update_sql = """UPDATE records SET patient_id = ?, date_of_visit_nonce = ?, date_of_visit_encrypt = ?, date_of_visit_tag = ?, visit_description_nonce = ?, 
+                              visit_description_encrypt = ?, visit_description_tag = ?, actions_taken_nonce = ?, actions_taken_encrypt = ?, actions_taken_tag = ? WHERE visit_id = ?"""
+        lookup_cursor.execute(update_sql,(patient_id, date_of_visit_nonce, date_of_visit_cipher, date_of_visit_tag, description_nonce, description_cipher, description_tag, actions_taken_nonce, actions_taken_cipher, actions_taken_tag, visit_id))
         lookup_db.commit()
         lookup_db.close()
         return True        
     else:
         return False
 
+
+
 def main():
-    #option = input("Press 1 to login: ")
-    #while int(option) != 1:
-    #    print("Invalid input!")
-    #    option = input("Press 1 to login: ")
-
-    #new_user("ZJ", "Zac", "Johnson", "Admin")
-    #reset_password("ZJ")
-    #print("Enter Login Details")
-    #add_patient_record("Joe", "Bloggs", "05/03/05", "123 Fake St, Bloomington, SA")
-
-    #add_visit_record(1, "1", "1", "ZJ")
-    #add_visit_record(2, "1", "1", "")
-
-    print(return_specialist_records("OSpec1"))
+    pass
 
 
 
 if __name__ == "__main__":
-    #main()
+    main()
 
     lookup_db = sqlite3.connect("lookup.db")
     lookup_cursor = lookup_db.cursor()
